@@ -1,0 +1,13 @@
+bin/*
+build/*
+thirdparty/*
+
+!bin/data
+
+!thirdparty/CMakeLists.txt
+
+!thirdparty/glad-gl-4.6
+
+!thirdparty/stb
+thirdparty/stb/*
+!thirdparty/stb/CMakeLists.txt
