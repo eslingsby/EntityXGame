@@ -58,7 +58,8 @@ set_target_properties("SDL2main" PROPERTIES FOLDER "Thirdparty")
 option(ENTITYX_BUILD_SHARED "" OFF)
 option(ENTITYX_BUILD_TESTING "" OFF)
 
-add_external_tar("entityx-1.1.2" "https://github.com/alecthomas/entityx/archive/1.1.2.tar.gz" "")
+#add_external_tar("entityx-1.1.2" "https://github.com/alecthomas/entityx/archive/1.1.2.tar.gz" "")
+add_external_tar("alecthomas-entityx-8262569" "https://codeload.github.com/alecthomas/entityx/legacy.tar.gz/8262569ed32a0c3a21321967cd61e6be8a6a90fb" "") # this almost certainly is not a long-term solution
 
 target_include_directories("entityx" PUBLIC
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/entityx-1.1.2>"

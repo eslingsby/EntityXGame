@@ -6,21 +6,13 @@
 
 #include <entityx\Entity.h>
 
-class Transform {
-public:
-	static const glm::vec3 localUp;
-	static const glm::vec3 localDown;
-	static const glm::vec3 localLeft;
-	static const glm::vec3 localRight;
-	static const glm::vec3 localForward;
-	static const glm::vec3 localBack;
-
-	static const glm::vec3 globalUp;
-	static const glm::vec3 globalDown;
-	static const glm::vec3 globalLeft;
-	static const glm::vec3 globalRight;
-	static const glm::vec3 globalForward;
-	static const glm::vec3 globalBack;
+struct Transform {
+	static const glm::vec3 up;
+	static const glm::vec3 down;
+	static const glm::vec3 left;
+	static const glm::vec3 right;
+	static const glm::vec3 forward;
+	static const glm::vec3 back;
 
 	entityx::Entity parent;
 
@@ -30,7 +22,7 @@ public:
 
 	glm::mat4 localMatrix() const;
 	glm::mat4 globalMatrix() const;
-	void globalDecomposed(glm::vec3* position, glm::quat* rotation, glm::vec3* scale) const;
+	void globalDecomposed(glm::vec3* position, glm::quat* rotation = nullptr, glm::vec3* scale = nullptr) const;
 
 	void localRotate(const glm::quat& rotation);
 	void localTranslate(const glm::vec3& translation);

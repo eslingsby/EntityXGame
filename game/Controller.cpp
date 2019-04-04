@@ -1,6 +1,24 @@
 #include "Controller.hpp"
 
 #include "Transform.hpp"
+#include "Collider.hpp"
+
+void Controller::_keepUpright(){
+	if (!_controlled.has_component<Transform>() || !_controlled.has_component<Collider>())
+		return;
+
+	auto transform = _controlled.component<Transform>();
+	auto collider = _controlled.component<Collider>();
+
+	collider->rigidBody->activate();
+
+	glm::vec3 eulerAngles = glm::eulerAngles(transform->rotation);
+
+	eulerAngles.x = 0;
+	eulerAngles.y = 0;
+
+	transform->rotation = glm::quat(eulerAngles);
+}
 
 void Controller::configure(entityx::EventManager &events){
 	events.subscribe<CursorEnterEvent>(*this);
@@ -22,25 +40,27 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	float moveSpeed = 300.f * dt;
 	
 	if (_boost)
-		moveSpeed = 1000.f * dt;
-	
-	transform->localTranslate(glm::vec3(0.f, 0.f, -_flash * 100.f));
+		moveSpeed = 1000.f * dt;	
+
+	transform->localTranslate(Transform::forward * _flash * 100.f);
 	
 	if (_forward)
-		transform->localTranslate(Transform::localForward * (float)moveSpeed);
+		transform->localTranslate(Transform::forward * (float)moveSpeed);
 	if (_back)
-		transform->localTranslate(Transform::localBack * (float)moveSpeed);
+		transform->localTranslate(Transform::back * (float)moveSpeed);
 	if (_left)
-		transform->localTranslate(Transform::localLeft * (float)moveSpeed);
+		transform->localTranslate(Transform::left * (float)moveSpeed);
 	if (_right)
-		transform->localTranslate(Transform::localRight * (float)moveSpeed);
+		transform->localTranslate(Transform::right * (float)moveSpeed);
 	if (_up)
-		transform->globalTranslate(Transform::globalUp * (float)moveSpeed);
+		transform->globalTranslate(Transform::up * (float)moveSpeed);
 	if (_down)
-		transform->globalTranslate(Transform::globalDown * (float)moveSpeed);
+		transform->globalTranslate(Transform::down * (float)moveSpeed);
 
 	_flash = 0;
 	_mousePos = { 0.0, 0.0 };
+
+	_keepUpright();
 }
 
 void Controller::receive(const CursorEnterEvent& cursorEnterEvent){
@@ -92,6 +112,10 @@ void Controller::receive(const MousePressEvent& mousePressEvent){
 
 void Controller::receive(const ScrollWheelEvent& scrollWheelEvent){
 	_flash = scrollWheelEvent.offset.y;
+}
+
+void Controller::receive(const PhysicsUpdateEvent& physicsUpdateEvent) {
+	_keepUpright();
 }
 
 void Controller::setControlled(entityx::Entity entity){

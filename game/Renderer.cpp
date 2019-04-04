@@ -21,7 +21,7 @@ std::string Renderer::_fullPath(const std::string & relativePath) const {
 Renderer::Renderer(const ConstructorInfo& constructorInfo) : 
 		_path(constructorInfo.path), 
 		_glLoader(constructorInfo.attributes),
-		_shape(constructorInfo.defualtShape), 
+		//_shape(constructorInfo.defualtShape), 
 		_uniformNames(constructorInfo.uniformNames),
 		_defaultVertexShader(constructorInfo.defaultVertexShader),
 		_defaultFragmentShader(constructorInfo.defaultFragmentShader),
@@ -34,6 +34,7 @@ Renderer::Renderer(const ConstructorInfo& constructorInfo) :
 
 void Renderer::configure(entityx::EventManager& events) {
 	events.subscribe<entityx::ComponentAddedEvent<Model>>(*this);
+	events.subscribe<entityx::ComponentAddedEvent<Camera>>(*this);
 	events.subscribe<FramebufferSizeEvent>(*this);
 
 	glDebugMessageCallback(errorCallback, nullptr);
@@ -50,12 +51,14 @@ void Renderer::configure(entityx::EventManager& events) {
 void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt) {
 	glm::mat4 projectionMatrix;
 	
-	if (_shape.verticalFov && _shape.size.x && _shape.size.y && _shape.zDepth)
-		projectionMatrix = glm::perspectiveFov(glm::radians(_shape.verticalFov), (float)_shape.size.x, (float)_shape.size.y, 1.f, _shape.zDepth);
-	
+	if (_camera.valid() && _camera.has_component<Camera>()) {
+		auto camera = _camera.component<Camera>();
+		projectionMatrix = glm::perspectiveFov(glm::radians(camera->verticalFov), (float)_frameBufferSize.x, (float)_frameBufferSize.y, 1.f, camera->zDepth);
+	}
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glViewport(0, 0, _shape.size.x, _shape.size.y);
+	glViewport(0, 0, _frameBufferSize.x, _frameBufferSize.y);
 	
 	for (auto entity : entities.entities_with_components<Transform, Model>()) {
 		const Transform& transform = *entity.component<Transform>().get();
@@ -136,12 +139,12 @@ void Renderer::receive(const entityx::ComponentAddedEvent<Model>& modelAddedEven
 	}
 }
 
-void Renderer::receive(const FramebufferSizeEvent& frameBufferSizeEvent){
-	_shape.size = frameBufferSizeEvent.size;
+void Renderer::receive(const entityx::ComponentAddedEvent<Camera>& cameraAddedEvent) {
+	_camera = cameraAddedEvent.entity;
 }
 
-void Renderer::setCamera(entityx::Entity entity){
-	_camera = entity;
+void Renderer::receive(const FramebufferSizeEvent& frameBufferSizeEvent){
+	_frameBufferSize = frameBufferSizeEvent.size;
 }
 
 void Renderer::setMainProgram(const std::string & vertexFile, const std::string & fragmentFile) {
@@ -228,10 +231,21 @@ entityx::Entity Renderer::createScene(entityx::EntityManager& entities, const st
 }
 
 glm::mat4 Renderer::viewMatrix() const {
-	if (!_camera.valid() || !_camera.has_component<Transform>())
+	if (!_camera.valid() || !_camera.has_component<Transform>() || !_camera.has_component<Camera>())
 		return glm::mat4();
 
-	return glm::inverse(_camera.component<const Transform>()->globalMatrix());
+	auto transform = _camera.component<const Transform>();
+	auto camera = _camera.component<const Camera>();
+
+	glm::mat4 view;
+	view = glm::translate(view, transform->position);
+	view *= glm::mat4_cast(transform->rotation);
+
+	glm::mat4 offset;
+	offset = glm::translate(offset, camera->offsetPosition);
+	offset *= glm::mat4_cast(camera->offsetRotation);
+
+	return glm::inverse(view * offset);
 }
 
 /*

@@ -3,6 +3,7 @@
 #include <entityx\System.h>
 
 #include "WindowEvents.hpp"
+#include "PhysicsEvents.hpp"
 
 class Controller : public entityx::System<Controller>, public entityx::Receiver<Controller> {
 	entityx::Entity _controlled;
@@ -24,6 +25,8 @@ class Controller : public entityx::System<Controller>, public entityx::Receiver<
 	bool _locked = false;
 	bool _cursorInside = false;
 
+	void _keepUpright();
+
 public:
 	void configure(entityx::EventManager &events) final;
 	void update(entityx::EntityManager &es, entityx::EventManager &events, double dt) final;
@@ -33,6 +36,7 @@ public:
 	void receive(const KeyInputEvent& keyInputEvent);
 	void receive(const MousePressEvent& mousePressEvent);
 	void receive(const ScrollWheelEvent& scrollWheelEvent);
+	void receive(const PhysicsUpdateEvent& physicsUpdateEvent);
 
 	void setControlled(entityx::Entity entity);
 };

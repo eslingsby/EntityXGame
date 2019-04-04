@@ -8,6 +8,7 @@ class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 	int _error = 0;
 
 	entityx::Entity _camera;
+	std::vector<entityx::Entity> _sandbox;
 
 public:
 	Game(int argc, char** argv);

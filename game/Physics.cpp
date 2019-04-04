@@ -2,15 +2,16 @@
 
 #include <btBulletCollisionCommon.h>
 #include "Transform.hpp"
+#include "PhysicsEvents.hpp"
 
-Physics::Physics(){
+Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(constructorInfo) {
 	_collisionConfiguration = new btDefaultCollisionConfiguration();
 	_dispatcher = new btCollisionDispatcher(_collisionConfiguration);
 	_overlappingPairCache = new btDbvtBroadphase();
 	_solver = new btSequentialImpulseConstraintSolver;
 	_dynamicsWorld = new btDiscreteDynamicsWorld(_dispatcher, _overlappingPairCache, _solver, _collisionConfiguration);
 
-	_dynamicsWorld->setGravity(btVector3(0.f, 0.f, -200.f));
+	_dynamicsWorld->setGravity(toBt(_constructorInfo.defaultGravity));
 }
 
 Physics::~Physics(){
@@ -58,8 +59,30 @@ void Physics::update(entityx::EntityManager & entities, entityx::EventManager & 
 		entity.component<Collider>()->rigidBody->setWorldTransform(colliderTransform);
 	}
 
-	//for (uint32_t i = 0; i < 10; i++)
-		_dynamicsWorld->stepSimulation((btScalar)(dt) / 1, 0);
+	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++) {
+		_dynamicsWorld->stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
+		events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
+	}
+	
+	//for (uint32_t i = 0; i < _dispatcher->getNumManifolds(); i++) {
+	//	const auto manifold = _dispatcher->getManifoldByIndexInternal(i);
+	//
+	//	if (!manifold->getNumContacts())
+	//		continue;
+	//
+	//	const Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+	//	const Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+	//
+	//	for (uint32_t x = 0; x < manifold->getNumContacts(); x++) {
+	//		const auto point = manifold->getContactPoint(x);
+	//
+	//		events.emit<ContactEvent>(ContactEvent{ firstCollider->self, secondCollider->self, fromBt(point.getPositionWorldOnB()), fromBt(point.m_normalWorldOnB) });
+	//	}
+	//}
+}
+
+void Physics::setGravity(const glm::vec3 & gravity){
+	_dynamicsWorld->setGravity(toBt(gravity));
 }
 
 void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent) {
@@ -78,7 +101,7 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 		collider->collisionShape = new btStaticPlaneShape(btVector3(shapeInfo.a, shapeInfo.b, shapeInfo.c), shapeInfo.d);
 		break;
 	case Collider::Capsule:
-		collider->collisionShape = new btCapsuleShape(shapeInfo.a, shapeInfo.b);
+		collider->collisionShape = new btCapsuleShapeZ(shapeInfo.a, shapeInfo.b);
 		break;
 	case Collider::Cylinder:
 		collider->collisionShape = new btCylinderShape(btVector3(shapeInfo.a, shapeInfo.b, shapeInfo.c));
@@ -94,6 +117,7 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 	collider->rigidBody = new btRigidBody(rbInfo);
 
 	collider->rigidBody->setGravity(toBt(collider->rigidInfo.gravity));
+	collider->rigidBody->setUserPointer(collider.get());
 
 	if (collider->rigidInfo.kinematic)
 		collider->rigidBody->setFlags(collider->rigidBody->getFlags() | btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);

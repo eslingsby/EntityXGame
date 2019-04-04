@@ -3,19 +3,12 @@
 #include <glm\gtc\matrix_transform.hpp>
 #include <glm\gtx\matrix_decompose.hpp>
 
-const glm::vec3 Transform::globalUp(0, 0, 1);
-const glm::vec3 Transform::globalDown(0, 0, -1);
-const glm::vec3 Transform::globalLeft(-1, 0, 0);
-const glm::vec3 Transform::globalRight(1, 0, 0);
-const glm::vec3 Transform::globalForward(0, 1, 0);
-const glm::vec3 Transform::globalBack(0, -1, 0);
-
-const glm::vec3 Transform::localUp(0, 1, 0);
-const glm::vec3 Transform::localDown(0, -1, 0);
-const glm::vec3 Transform::localLeft(-1, 0, 0);
-const glm::vec3 Transform::localRight(1, 0, 0);
-const glm::vec3 Transform::localForward(0, 0, -1);
-const glm::vec3 Transform::localBack(0, 0, 1);
+const glm::vec3 Transform::up(0, 0, 1);
+const glm::vec3 Transform::down(0, 0, -1);
+const glm::vec3 Transform::left(-1, 0, 0);
+const glm::vec3 Transform::right(1, 0, 0);
+const glm::vec3 Transform::forward(0, 1, 0);
+const glm::vec3 Transform::back(0, -1, 0);
 
 glm::mat4 Transform::localMatrix() const {
 	glm::mat4 matrix;

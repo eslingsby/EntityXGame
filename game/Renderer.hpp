@@ -1,12 +1,15 @@
 #pragma once
 
 #include <entityx\System.h>
+#include <SDL_events.h>
 
 #include "GlLoader.hpp"
+
+#include "Transform.hpp"
 #include "Model.hpp"
+#include "Camera.hpp"
 
 #include "WindowEvents.hpp"
-#include <SDL_events.h>
 
 class Renderer : public entityx::System<Renderer>, public entityx::Receiver<Renderer> {
 public:
@@ -19,16 +22,16 @@ public:
 		//std::string bonesUnifName = "bones";
 	};
 
-	struct ShapeInfo {
-		float verticalFov = 90.f;
-		float zDepth = 10000.f;
-		glm::uvec2 size = { 800, 600 };
-	};
+	//struct ShapeInfo {
+	//	float verticalFov = 90.f;
+	//	float zDepth = 10000.f;
+	//	glm::uvec2 size = { 800, 600 };
+	//};
 
 	struct ConstructorInfo {
 		std::string path = "";
 		GlLoader::AttributeInfo attributes;
-		ShapeInfo defualtShape;
+		//ShapeInfo defualtShape;
 		UnfiromInfo uniformNames;
 
 		std::string defaultVertexShader = "";
@@ -54,7 +57,8 @@ private:
 
 	GlLoader _glLoader;
 
-	ShapeInfo _shape;
+	//ShapeInfo _shape;
+	glm::uvec2 _frameBufferSize;
 	entityx::Entity _camera;
 
 	std::string _fullPath(const std::string& relativePath) const;
@@ -66,9 +70,9 @@ public:
 	void update(entityx::EntityManager &entities, entityx::EventManager &events, double dt) final;
 
 	void receive(const entityx::ComponentAddedEvent<Model>& modelAddedEvent);
+	void receive(const entityx::ComponentAddedEvent<Camera>& cameraAddedEvent);
 	void receive(const FramebufferSizeEvent& frameBufferSizeEvent);
 
-	void setCamera(entityx::Entity entity);
 	void setMainProgram(const std::string& vertexFile, const std::string& fragmentFile);
 	void setDefaultTexture(const std::string& textureFile);
 

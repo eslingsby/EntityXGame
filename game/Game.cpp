@@ -6,6 +6,7 @@
 #include "Transform.hpp"
 #include "Collider.hpp"
 #include "Physics.hpp"
+#include "Audio.hpp"
 
 #include <chrono>
 #include <experimental\filesystem>
@@ -41,18 +42,24 @@ Game::Game(int argc, char** argv){
 	rendererInfo.defaultVertexShader = "vertexShader.glsl";
 	rendererInfo.defaultFragmentShader = "fragmentShader.glsl";
 	rendererInfo.defaultTexture = "checker.png";
-	rendererInfo.defualtShape.zDepth = 100000.f;
+	//rendererInfo.defualtShape.zDepth = 1000000.f;
 
 	Window::ConstructorInfo windowInfo;
 	windowInfo.debugContext = true;
 	windowInfo.defaultWindow.title = "EntityX Game";
 	windowInfo.defaultWindow.lockedCursor = false;
 
+	Physics::ConstructorInfo physicsInfo;
+	physicsInfo.defaultGravity = { 0, 0, -5000 };
+	physicsInfo.stepsPerUpdate = 50;
+	physicsInfo.maxSubSteps = 0;
+
 	// Register systems
 	systems.add<Renderer>(rendererInfo);
 	systems.add<Window>(windowInfo);
-	systems.add<Physics>();
 	systems.add<Controller>();
+	systems.add<Physics>(physicsInfo);
+	systems.add<Audio>();
 
 	systems.configure();
 
@@ -67,26 +74,75 @@ Game::Game(int argc, char** argv){
 		_camera = entities.create();
 
 		auto transform = _camera.assign<Transform>();
-		transform->position = { 0.f, -100.f, 0.f };
-		transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
+		transform->position = { 0.f, -2000.f, 0.f };
+		transform->scale = { 200.f, 200.f, 500.f };
 
-		_camera.assign<Collider>(_camera, Collider::ShapeInfo{ Collider::Sphere, 10.f }, Collider::RigidInfo{ { 0.f, 0.f, 0.f }, 0.f, true });
+		auto camera = _camera.assign<Camera>();
+		camera->verticalFov = 90.f;
+		camera->zDepth = 1000000.f;
 
-		systems.system<Renderer>()->setCamera(_camera);
+		camera->offsetPosition = { 0, 0, 500.f };
+		camera->offsetRotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
+
+		//camera->offsetPosition = { 0, 1000, 250 };
+		//camera->offsetRotation = glm::quat({ glm::radians(90.f), 0, glm::radians(180.f) });
+
+		auto collider = _camera.assign<Collider>(_camera, Collider::ShapeInfo{ Collider::Capsule, 200.f, 600.f }, Collider::RigidInfo{ { 0.f, 0.f, 0.f }, 1.f });
+		collider->rigidBody->setLinearFactor(btVector3(0, 0, 1));
+		collider->rigidBody->setAngularFactor(btVector3(1, 1, 0));
+		//collider->rigidBody->setGravity(btVector3(0, 0, 0));
+
+		auto model = _camera.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
+	}
+
+	// Capsule
+	{
+		auto capsule = entities.create();
+
+		auto transform = capsule.assign<Transform>();
+		transform->scale = { 200.f, 200.f, 500.f };
+
+		auto model = capsule.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
+
+		auto collider = capsule.assign<Collider>(capsule, Collider::ShapeInfo{ Collider::Capsule, 200.f, 600.f }, Collider::RigidInfo{ { 0.f, 0.f, 0.f }, 1.f });
+		collider->rigidBody->setLinearFactor(btVector3(0, 0, 1));
 	}
 	
 	// Axis
-	for (uint32_t i = 0; i < 100; i++){	
-		entityx::Entity box = entities.create();
+	//for (uint32_t i = 0; i < 10; i++){	
+	//	entityx::Entity box = entities.create();
+	//
+	//	auto transform = box.assign<Transform>();
+	//	transform->position = { 0.f, 0.f, 200.f * i};
+	//	transform->scale = { 1000.f, 5000.f, 100.f };
+	//	//transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
+	//
+	//	transform->rotation = glm::quat({ 0.f, 0.f, 1.f * glm::radians(i * (360.f / 100) * 5.f) });
+	//
+	//	box.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
+	//
+	//	auto collider = box.assign<Collider>(box, Collider::ShapeInfo{ Collider::Box, 1000.f, 5000.f, 100.f }, Collider::RigidInfo{ {0.f, 0.f, 0.f}, 100.f });
+	//
+	//	//systems.system<Renderer>()->setCamera(box);
+	//
+	//	_sandbox.push_back(box);
+	//}
 
-		auto transform = box.assign<Transform>();
-		transform->position = { 0.f, 0.f, 10.f * i };
-		transform->scale = { 10.f, 10.f, 10.f };
+	// Axis
+	//{
+	//	entityx::Entity box = entities.create();
+	//
+	//	auto transform = box.assign<Transform>();
+	//	transform->position = { 0.f, 0.f, 200.f };
+	//	transform->scale = { 10.f, 10.f, 10.f };
+	//
+	//	box.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
+	//
+	//	auto collider = box.assign<Collider>(box, Collider::ShapeInfo{ Collider::Box, 10.f, 10.f, 10.f }, Collider::RigidInfo{ { 0.f, 0.f, 0.f }, 10.f });
+	//
+	//	//systems.system<Renderer>()->setCamera(box);
+	//}
 
-		box.assign<Model>(Model::FilePaths{ "axis.obj", 0, "rgb.png" });
-
-		auto collider = box.assign<Collider>(box, Collider::ShapeInfo{ Collider::Sphere, 10.f }, Collider::RigidInfo{ {0.f, 0.f, 0.f}, 10.f });
-	}
 
 	// Plane
 	{
@@ -94,7 +150,7 @@ Game::Game(int argc, char** argv){
 
 		auto transform = plane.assign<Transform>();
 		transform->position = { 0.f, 0.f, -100.f };
-		transform->scale = { 10000.f, 10000.f, 10000.f };
+		transform->scale = { 100000.f, 100000.f, 100000.f };
 
 		plane.assign<Model>(Model::FilePaths{ "plane.obj", 0, "checker.png" });
 
@@ -106,7 +162,7 @@ Game::Game(int argc, char** argv){
 		entityx::Entity skybox = entities.create();
 
 		auto transform = skybox.assign<Transform>();
-		transform->scale = { 1000.f, 1000.f, 1000.f };
+		transform->scale = { 10000.f, 10000.f, 10000.f };
 
 		skybox.assign<Model>(Model::FilePaths{ "skybox.obj", 0, "skybox.png" });
 	}
@@ -134,7 +190,24 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 	if (!systems.system<Window>()->windowInfo().lockedCursor) {
 		systems.system<Window>()->lockCursor(true);
 		systems.system<Controller>()->setControlled(_camera);
+
+		return;
 	}
+
+	if (mousePressEvent.action != Action::Press)
+		return;
+
+	entityx::Entity ball = entities.create();
+	
+	auto transform = ball.assign<Transform>();
+	transform->position = _camera.component<Transform>()->position;
+	transform->scale = { 100.f, 100.f, 100.f };
+	
+	ball.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
+	
+	ball.assign<Collider>(ball, Collider::ShapeInfo{ Collider::Box, 100.f, 100.f, 100.f }, Collider::RigidInfo{ { 0.f, 0.f, -10.f }, 10.f });
+
+	_sandbox.push_back(ball);
 }
 
 void Game::receive(const WindowOpenEvent& windowOpenEvent){
@@ -151,6 +224,13 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 		else {
 			_running = false;
 		}
+	}
+
+	if (keyInputEvent.key == Key_R && keyInputEvent.action == Action::Release) {
+		for (entityx::Entity& entity : _sandbox)
+			entity.destroy();
+
+		_sandbox.clear();
 	}
 }
 

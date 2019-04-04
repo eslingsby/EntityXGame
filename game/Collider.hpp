@@ -45,10 +45,7 @@ inline btVector3 toBt(const glm::vec3& from) {
 	};
 }
 
-class Collider : public btMotionState {
-	entityx::Entity _self;
-
-public:
+struct Collider : public btMotionState {
 	enum ShapeType {
 		Sphere, // a = radius
 		Box, // a = width, b = height, c = depth
@@ -80,21 +77,23 @@ public:
 		//float angularThreshold = 0.8f;
 	};
 
+	entityx::Entity self;
+
 	const ShapeInfo shapeInfo;
 	const RigidInfo rigidInfo;
 
 	btCollisionShape* collisionShape = nullptr;
 	btRigidBody* rigidBody = nullptr;
 
-	Collider(entityx::Entity self, ShapeInfo shapeInfo, RigidInfo rigidInfo = RigidInfo()) : _self(self), shapeInfo(shapeInfo), rigidInfo(rigidInfo) {
-		assert(_self.valid());
+	Collider(entityx::Entity self, ShapeInfo shapeInfo, RigidInfo rigidInfo = RigidInfo()) : self(self), shapeInfo(shapeInfo), rigidInfo(rigidInfo) {
+		assert(self.valid());
 	};
 
 	void getWorldTransform(btTransform& worldTransform) const final {
-		if (!_self.has_component<Transform>())
+		if (!self.has_component<Transform>())
 			return;
 		
-		auto transform = _self.component<const Transform>();
+		auto transform = self.component<const Transform>();
 
 		//glm::vec3 globalPosition;
 		//glm::quat globalRotation;
@@ -110,10 +109,10 @@ public:
 	}
 
 	void setWorldTransform(const btTransform& worldTransform) final {
-		if (!_self.has_component<Transform>())
+		if (!self.has_component<Transform>())
 			return;
 
-		auto transform = _self.component<Transform>();
+		auto transform = self.component<Transform>();
 
 		//if (transform->parent.valid() && transform->parent.has_component<Transform>()) {
 		//	glm::vec3 parentGlobalPosition;

@@ -4,8 +4,7 @@
 #include <string>
 #include <cstdint>
 
-class Model{
-public:
+struct Model{
 	struct FilePaths {
 		std::string meshFile = "";
 		uint32_t meshIndex = 0;
