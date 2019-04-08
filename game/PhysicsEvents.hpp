@@ -9,6 +9,8 @@ struct ContactEvent {
 
 	glm::vec3 globalContactPosition;
 	glm::vec3 globalContactNormal;
+	float contactDistance = 0.f;
+	float contactImpulse = 0.f;
 };
 
 struct CollidingEvent {

@@ -3,6 +3,7 @@
 #include <entityx\System.h>
 
 #include "Collider.hpp"
+
 #include <btBulletDynamicsCommon.h>
 
 class Physics : public entityx::System<Physics>, public entityx::Receiver<Physics> {
@@ -33,4 +34,7 @@ public:
 
 	void receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent);
 	void receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent);
+
+	friend void contactStartedCallback(btPersistentManifold* const&);
+	friend void contactEndedCallback(btPersistentManifold* const&);
 };

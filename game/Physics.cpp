@@ -4,6 +4,45 @@
 #include "Transform.hpp"
 #include "PhysicsEvents.hpp"
 
+/*
+typedef bool (*ContactDestroyedCallback)(void* userPersistentData);
+typedef bool (*ContactProcessedCallback)(btManifoldPoint& cp, void* body0, void* body1);
+typedef void (*ContactStartedCallback)(btPersistentManifold* const& manifold);
+typedef void (*ContactEndedCallback)(btPersistentManifold* const& manifold);
+
+typedef bool (*ContactAddedCallback)(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1);
+extern ContactAddedCallback gContactAddedCallback;
+
+///This is to allow MaterialCombiner/Custom Friction/Restitution values
+ContactAddedCallback gContactAddedCallback = 0;
+*/
+
+std::vector<CollidingEvent> collidingEvents;
+std::vector<ContactEvent> contactEvents;
+
+void contactStartedCallback(btPersistentManifold* const& manifold) {
+	Collider* collider0 = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* collider1 = (Collider*)manifold->getBody1()->getUserPointer();
+
+	collidingEvents.push_back(CollidingEvent{ true, ContactEvent{ collider0->self, collider1->self } });
+}
+
+void contactEndedCallback(btPersistentManifold* const& manifold) {
+	Collider* collider0 = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* collider1 = (Collider*)manifold->getBody1()->getUserPointer();
+
+	collidingEvents.push_back(CollidingEvent{ false, ContactEvent{collider0->self, collider1->self} });
+}
+
+bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
+	Collider* collider0 = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
+	Collider* collider1 = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
+
+	contactEvents.push_back(ContactEvent{ collider0->self, collider1->self });
+
+	return false;
+}
+
 Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(constructorInfo) {
 	_collisionConfiguration = new btDefaultCollisionConfiguration();
 	_dispatcher = new btCollisionDispatcher(_collisionConfiguration);
@@ -12,6 +51,10 @@ Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(cons
 	_dynamicsWorld = new btDiscreteDynamicsWorld(_dispatcher, _overlappingPairCache, _solver, _collisionConfiguration);
 
 	_dynamicsWorld->setGravity(toBt(_constructorInfo.defaultGravity));
+
+	gContactAddedCallback = contactAddedCallback;
+	gContactStartedCallback = contactStartedCallback;
+	gContactEndedCallback = contactEndedCallback;
 }
 
 Physics::~Physics(){
@@ -34,51 +77,65 @@ Physics::~Physics(){
 void Physics::configure(entityx::EventManager & events){
 	events.subscribe<entityx::ComponentAddedEvent<Collider>>(*this);
 	events.subscribe<entityx::ComponentRemovedEvent<Collider>>(*this);
+
+	//_eventsPtr = &events;
 }
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
 	for (auto entity : entities.entities_with_components<Transform, Collider>()) {
 		//glm::vec3 globalPosition;
 		//glm::quat globalRotation;
-
-		//glm::mat4 globalMatrix = entity.component<Transform>()->globalMatrix();
-
-		const auto transform = entity.component<Transform>();
-
-		//entity.component<Transform>()->globalDecomposed(&globalPosition, &globalRotation, nullptr);
-		
+		//
+		//entity.component<Transform>()->globalDecomposed(&globalPosition, &globalRotation);
+		//
+		////glm::mat4 globalMatrix = entity.component<Transform>()->globalMatrix();
+		//
+		//btTransform colliderTransform;
+		//
+		////olliderTransform.setFromOpenGLMatrix((btScalar*)&globalMatrix[0]);
+		//
+		//colliderTransform.setOrigin(toBt(globalPosition));
+		//colliderTransform.setRotation(toBt(globalRotation));
+		//
 		//auto collider = entity.component<Collider>();
-		btTransform colliderTransform;
+		//
+		//collider->rigidBody->setWorldTransform(colliderTransform);
+		//
+		////collider->rigidBody->setSca
+	
 
+		auto transform = entity.component<Transform>();
+		auto collider = entity.component<Collider>();
+		
+		glm::vec3 globalPosition;
+		glm::quat globalRotation;
 
-		//colliderTransform.setFromOpenGLMatrix((btScalar*)&globalMatrix[0]);
+		transform->globalDecomposed(&globalPosition, &globalRotation);
+		
+		btTransform newTransform;
 
-		colliderTransform.setOrigin(toBt(transform->position));
-		colliderTransform.setRotation(toBt(transform->rotation));
+		newTransform.setOrigin(toBt(globalPosition));
+		newTransform.setRotation(toBt(globalRotation));
 
-		entity.component<Collider>()->rigidBody->setWorldTransform(colliderTransform);
+		collider->rigidBody->setWorldTransform(newTransform);
+	
 	}
 
 	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++) {
 		_dynamicsWorld->stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
+
+		for (const CollidingEvent& collidingEvent : collidingEvents)
+			events.emit<CollidingEvent>(collidingEvent);
+
+		collidingEvents.clear();
+
+		for (const ContactEvent& contactEvent : contactEvents)
+			events.emit<ContactEvent>(contactEvent);
+
+		contactEvents.clear();
+
 		events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
 	}
-	
-	//for (uint32_t i = 0; i < _dispatcher->getNumManifolds(); i++) {
-	//	const auto manifold = _dispatcher->getManifoldByIndexInternal(i);
-	//
-	//	if (!manifold->getNumContacts())
-	//		continue;
-	//
-	//	const Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
-	//	const Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
-	//
-	//	for (uint32_t x = 0; x < manifold->getNumContacts(); x++) {
-	//		const auto point = manifold->getContactPoint(x);
-	//
-	//		events.emit<ContactEvent>(ContactEvent{ firstCollider->self, secondCollider->self, fromBt(point.getPositionWorldOnB()), fromBt(point.m_normalWorldOnB) });
-	//	}
-	//}
 }
 
 void Physics::setGravity(const glm::vec3 & gravity){
@@ -87,6 +144,8 @@ void Physics::setGravity(const glm::vec3 & gravity){
 
 void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent) {
 	auto collider = colliderAddedEvent.component;
+
+	collider->self = colliderAddedEvent.entity;
 
 	const Collider::ShapeInfo& shapeInfo = collider->shapeInfo;
 
@@ -109,18 +168,49 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 	}
 
 	btVector3 localInertia(0.f, 0.f, 0.f);
-	
-	if (collider->rigidInfo.mass != 0.f)
-		collider->collisionShape->calculateLocalInertia(collider->rigidInfo.mass, localInertia);
 
-	btRigidBody::btRigidBodyConstructionInfo rbInfo(collider->rigidInfo.mass, (btMotionState*)collider.get(), collider->collisionShape, localInertia);
+	float mass = collider->bodyInfo.mass;
+	
+	if (collider->bodyInfo.type == Collider::Static || collider->bodyInfo.type == Collider::Trigger)
+		mass = 0.f;
+
+	if (mass != 0.f)
+		collider->collisionShape->calculateLocalInertia(mass, localInertia);
+
+	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, (btMotionState*)collider.get(), collider->collisionShape, localInertia);
 	collider->rigidBody = new btRigidBody(rbInfo);
 
-	collider->rigidBody->setGravity(toBt(collider->rigidInfo.gravity));
+	//collider->rigidBody->setGravity(toBt(collider->bodyInfo.gravity));
 	collider->rigidBody->setUserPointer(collider.get());
 
-	if (collider->rigidInfo.kinematic)
-		collider->rigidBody->setFlags(collider->rigidBody->getFlags() | btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
+	switch (collider->bodyInfo.type) {
+	//case Collider::Kinematic:
+	//	collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
+	//	break;
+
+	case Collider::Static:
+		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
+		break;
+
+	case Collider::StaticTrigger:
+		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT | btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
+		break;
+
+	case Collider::Trigger:
+		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
+		break;
+	}
+
+	collider->rigidBody->setAngularFactor(toBt(collider->bodyInfo.defaultAngularFactor));
+	collider->rigidBody->setAngularFactor(toBt(collider->bodyInfo.defaultAngularFactor));
+	collider->rigidBody->setAngularVelocity(toBt(collider->bodyInfo.startingAngularVelocity));
+	collider->rigidBody->setAngularVelocity(toBt(collider->bodyInfo.startingLinearVelocity));
+
+	if (collider->bodyInfo.alwaysActive)// || collider->bodyInfo.type == Collider::Trigger || collider->bodyInfo.type == Collider::StaticTrigger)
+		collider->setAlwaysActive(true);
+
+	if (collider->bodyInfo.callbacks)
+		collider->rigidBody->setCollisionFlags(collider->rigidBody->getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK);
 	
 	_dynamicsWorld->addRigidBody(collider->rigidBody);
 }

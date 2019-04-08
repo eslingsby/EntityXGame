@@ -24,7 +24,7 @@ glm::mat4 Transform::globalMatrix() const {
 	glm::mat4 matrix;
 
 	const Transform* transform = this;
-
+	
 	do {
 		matrix = transform->localMatrix() * matrix;
 	
@@ -39,17 +39,42 @@ glm::mat4 Transform::globalMatrix() const {
 }
 
 void Transform::globalDecomposed(glm::vec3* position, glm::quat* rotation, glm::vec3* scale) const {
-	void* junk = malloc(sizeof(float) * 4);
+	//glm::vec3 tempPosition;
+	//glm::quat tempRotation;
+	//glm::vec3 tempScale;
+	//
+	//if (!position)
+	//	position = &tempPosition;
+	//if (!rotation)
+	//	rotation = &tempRotation;
+	//if (!scale)
+	//	scale = &tempScale;
+	//
+	//glm::decompose(globalMatrix(), *scale, *rotation, *position, glm::vec3(), glm::vec4());
 
-	if (!position)
-		position = (glm::vec3*)junk;
-	if (!rotation)
-		rotation = (glm::quat*)junk;
-	if (!scale)
-		scale = (glm::vec3*)junk;
 
-	glm::decompose(globalMatrix(), *scale, *rotation, *position, glm::vec3(), glm::vec4());
-	free(junk);
+
+
+
+	const Transform* transform = this;
+	
+	if (scale)
+		*scale = { 1.f, 1.f, 1.f };
+	
+	do {
+		if (position)
+			*position = transform->position + transform->rotation * *position;
+		if (rotation)
+			*rotation = transform->rotation * *rotation;
+		if (scale)
+			*scale *= transform->scale;
+	
+		if (transform->parent.valid() && transform->parent.has_component<Transform>())
+			transform = transform->parent.component<const Transform>().get();
+		else
+			transform = nullptr;
+	
+	} while (transform);
 }
 
 void Transform::localRotate(const glm::quat& rotate) {

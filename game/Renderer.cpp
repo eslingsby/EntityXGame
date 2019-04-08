@@ -21,7 +21,6 @@ std::string Renderer::_fullPath(const std::string & relativePath) const {
 Renderer::Renderer(const ConstructorInfo& constructorInfo) : 
 		_path(constructorInfo.path), 
 		_glLoader(constructorInfo.attributes),
-		//_shape(constructorInfo.defualtShape), 
 		_uniformNames(constructorInfo.uniformNames),
 		_defaultVertexShader(constructorInfo.defaultVertexShader),
 		_defaultFragmentShader(constructorInfo.defaultFragmentShader),
@@ -51,6 +50,9 @@ void Renderer::configure(entityx::EventManager& events) {
 void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt) {
 	glm::mat4 projectionMatrix;
 	
+	if (_frameBufferSize == glm::uvec2{ 0, 0 })
+		return;
+
 	if (_camera.valid() && _camera.has_component<Camera>()) {
 		auto camera = _camera.component<Camera>();
 		projectionMatrix = glm::perspectiveFov(glm::radians(camera->verticalFov), (float)_frameBufferSize.x, (float)_frameBufferSize.y, 1.f, camera->zDepth);
@@ -237,9 +239,14 @@ glm::mat4 Renderer::viewMatrix() const {
 	auto transform = _camera.component<const Transform>();
 	auto camera = _camera.component<const Camera>();
 
+	glm::vec3 globalPosition;
+	glm::quat globalRotation;
+
+	transform->globalDecomposed(&globalPosition, &globalRotation);
+
 	glm::mat4 view;
-	view = glm::translate(view, transform->position);
-	view *= glm::mat4_cast(transform->rotation);
+	view = glm::translate(view, globalPosition);
+	view *= glm::mat4_cast(globalRotation);
 
 	glm::mat4 offset;
 	offset = glm::translate(offset, camera->offsetPosition);

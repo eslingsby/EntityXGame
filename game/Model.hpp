@@ -3,6 +3,7 @@
 #include "GlLoader.hpp"
 #include <string>
 #include <cstdint>
+#include <entityx\Entity.h>
 
 struct Model{
 	struct FilePaths {
@@ -16,5 +17,9 @@ struct Model{
 	GlLoader::MeshContext meshContext;
 	GlLoader::TextureContext textureContext;
 
-	Model(FilePaths filePaths) : filePaths(filePaths) {}
+	Model(FilePaths filePaths);
+
+	void setModel(entityx::Entity self, const FilePaths& filePaths);
+	void setMesh(entityx::Entity self, const std::string& meshFile, uint32_t meshIndex = 0);
+	void setTexture(entityx::Entity self, const std::string& textureFile);
 };

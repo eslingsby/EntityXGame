@@ -12,5 +12,6 @@ public:
 	void configure(entityx::EventManager &events) final;
 	void update(entityx::EntityManager &entities, entityx::EventManager &events, double dt) final;
 
+	void receive(const CollidingEvent& collidingEvent);
 	void receive(const ContactEvent& contactEvent);
 };

@@ -6,7 +6,10 @@
 #include "PhysicsEvents.hpp"
 
 class Controller : public entityx::System<Controller>, public entityx::Receiver<Controller> {
-	entityx::Entity _controlled;
+	//entityx::Entity _controlled;
+
+	entityx::Entity _head;
+	entityx::Entity _body;
 
 	bool _forward = false;
 	bool _back = false;
@@ -15,6 +18,8 @@ class Controller : public entityx::System<Controller>, public entityx::Receiver<
 
 	bool _up = false;
 	bool _down = false;
+
+	bool _jumped = false;
 
 	bool _boost = false;
 
@@ -25,7 +30,11 @@ class Controller : public entityx::System<Controller>, public entityx::Receiver<
 	bool _locked = false;
 	bool _cursorInside = false;
 
-	void _keepUpright();
+	float _xAngle = 0.f;
+	
+	bool _enabled = true;
+
+	uint32_t _touchingCount = 0;
 
 public:
 	void configure(entityx::EventManager &events) final;
@@ -36,7 +45,8 @@ public:
 	void receive(const KeyInputEvent& keyInputEvent);
 	void receive(const MousePressEvent& mousePressEvent);
 	void receive(const ScrollWheelEvent& scrollWheelEvent);
-	void receive(const PhysicsUpdateEvent& physicsUpdateEvent);
+	void receive(const CollidingEvent& collidingEvent);
 
-	void setControlled(entityx::Entity entity);
+	void setEnabled(bool enabled);
+	void setControlled(entityx::Entity head, entityx::Entity body);
 };

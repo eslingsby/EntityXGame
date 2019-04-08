@@ -8,41 +8,19 @@
 #include "Transform.hpp"
 
 inline glm::quat fromBt(const btQuaternion& from) {
-	return glm::quat{
-		static_cast<float>(from.w()),
-		static_cast<float>(from.x()),
-		static_cast<float>(from.y()),
-		static_cast<float>(from.z())
-	};
+	return glm::quat(from.w(), from.x(), from.y(), from.z());
 }
 
 inline glm::vec3 fromBt(const btVector3& from) {
-	return glm::vec3{
-		static_cast<float>(from.x()),
-		static_cast<float>(from.y()),
-		static_cast<float>(from.z())
-	};
-}
-
-inline float fromBt(const btScalar& from) {
-	return static_cast<float>(from);
+	return glm::vec3(from.x(), from.y(), from.z());
 }
 
 inline btQuaternion toBt(const glm::quat& from) {
-	return btQuaternion{
-		static_cast<btScalar>(from.x),
-		static_cast<btScalar>(from.y),
-		static_cast<btScalar>(from.z),
-		static_cast<btScalar>(from.w)
-	};
+	return btQuaternion(from.x, from.y, from.z, from.w);
 }
 
 inline btVector3 toBt(const glm::vec3& from) {
-	return btVector3{
-		static_cast<btScalar>(from.x),
-		static_cast<btScalar>(from.y),
-		static_cast<btScalar>(from.z)
-	};
+	return btVector3(from.x, from.y, from.z);
 }
 
 struct Collider : public btMotionState {
@@ -54,6 +32,14 @@ struct Collider : public btMotionState {
 		Plane
 	};
 
+	enum BodyType {
+		Dynamic,
+		Static,
+		//Kinematic,
+		Trigger,
+		StaticTrigger
+	};
+
 	struct ShapeInfo {
 		ShapeType type = Sphere;
 
@@ -63,11 +49,18 @@ struct Collider : public btMotionState {
 		float d = 0.f;
 	};
 
-	struct RigidInfo {
-		glm::vec3 gravity;
-		float mass = 10.f;
+	struct BodyInfo {
+		BodyType type = Dynamic;
+		float mass = 0.f;
 
-		bool kinematic = false;
+		bool alwaysActive = false;
+		bool callbacks = false;
+
+		glm::vec3 defaultLinearFactor = { 1, 1, 1 };
+		glm::vec3 defaultAngularFactor = { 1, 1, 1 };
+
+		glm::vec3 startingLinearVelocity;
+		glm::vec3 startingAngularVelocity;
 
 		glm::vec3 centerOfMass;
 
@@ -80,54 +73,20 @@ struct Collider : public btMotionState {
 	entityx::Entity self;
 
 	const ShapeInfo shapeInfo;
-	const RigidInfo rigidInfo;
+	const BodyInfo bodyInfo;
 
 	btCollisionShape* collisionShape = nullptr;
 	btRigidBody* rigidBody = nullptr;
 
-	Collider(entityx::Entity self, ShapeInfo shapeInfo, RigidInfo rigidInfo = RigidInfo()) : self(self), shapeInfo(shapeInfo), rigidInfo(rigidInfo) {
-		assert(self.valid());
-	};
+	Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo = BodyInfo());
 
-	void getWorldTransform(btTransform& worldTransform) const final {
-		if (!self.has_component<Transform>())
-			return;
-		
-		auto transform = self.component<const Transform>();
+	void getWorldTransform(btTransform& worldTransform) const final;
+	void setWorldTransform(const btTransform& worldTransform) final;
 
-		//glm::vec3 globalPosition;
-		//glm::quat globalRotation;
-
-		//transform->globalDecomposed(&posiition, &globalRotation, nullptr);
-
-		//if (transform->parent.valid() && transform->parent.has_component<Transform>())
-		//	worldTransform.setOrigin(toBt(globalPosition + transform->rotation * rigidInfo.centerOfMass));
-		//else
-			worldTransform.setOrigin(toBt(transform->position));
-
-		worldTransform.setRotation(toBt(transform->rotation));
-	}
-
-	void setWorldTransform(const btTransform& worldTransform) final {
-		if (!self.has_component<Transform>())
-			return;
-
-		auto transform = self.component<Transform>();
-
-		//if (transform->parent.valid() && transform->parent.has_component<Transform>()) {
-		//	glm::vec3 parentGlobalPosition;
-		//	glm::quat parentGlobalRotation;
-		//
-		//	transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation, nullptr);
-		//
-		//	transform->position = (fromBt(worldTransform.getOrigin()) - parentGlobalPosition) * parentGlobalRotation;
-		//	transform->rotation = glm::inverse(parentGlobalRotation) * fromBt(worldTransform.getRotation());
-		//}
-		//else {
-			//transform->position = fromBt(worldTransform.getOrigin()) - transform->rotation * rigidInfo.centerOfMass;
-			transform->position = fromBt(worldTransform.getOrigin());
-
-			transform->rotation = fromBt(worldTransform.getRotation());
-		//}
-	}
+	void setActive(bool active);
+	void setAlwaysActive(bool alwaysActive);
+	void setLinearVelocity(const glm::vec3& velocity);
+	void setAngularVelocity(const glm::vec3& velocity);
+	void setLinearFactor(const glm::vec3& factor);
+	void setAngularFactor(const glm::vec3& factor);
 };

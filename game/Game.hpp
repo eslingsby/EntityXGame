@@ -2,14 +2,18 @@
 
 #include <entityx\entityx.h>
 #include "WindowEvents.hpp"
+#include <glm\vec3.hpp>
 
 class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 	bool _running = true;
 	int _error = 0;
 
-	entityx::Entity _camera;
-	std::vector<entityx::Entity> _sandbox;
+	entityx::Entity _body;
+	entityx::Entity _head;
 
+	glm::vec3 _spawnLocation;
+
+	std::vector<entityx::Entity> _sandbox;
 public:
 	Game(int argc, char** argv);
 

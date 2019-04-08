@@ -3,64 +3,80 @@
 #include "Transform.hpp"
 #include "Collider.hpp"
 
-void Controller::_keepUpright(){
-	if (!_controlled.has_component<Transform>() || !_controlled.has_component<Collider>())
-		return;
-
-	auto transform = _controlled.component<Transform>();
-	auto collider = _controlled.component<Collider>();
-
-	collider->rigidBody->activate();
-
-	glm::vec3 eulerAngles = glm::eulerAngles(transform->rotation);
-
-	eulerAngles.x = 0;
-	eulerAngles.y = 0;
-
-	transform->rotation = glm::quat(eulerAngles);
-}
-
 void Controller::configure(entityx::EventManager &events){
 	events.subscribe<CursorEnterEvent>(*this);
 	events.subscribe<CursorPositionEvent>(*this);
 	events.subscribe<KeyInputEvent>(*this);
 	events.subscribe<MousePressEvent>(*this);
 	events.subscribe<ScrollWheelEvent>(*this);
+	events.subscribe<CollidingEvent>(*this);
 }
 
 void Controller::update(entityx::EntityManager &entities, entityx::EventManager &events, double dt){
-	if (!_controlled.valid() || !_controlled.has_component<Transform>())
+	if (!_head.valid() ||
+		!_head.has_component<Transform>() ||
+		!_body.valid() || 
+		!_body.has_component<Transform>())
 		return;
 
-	auto transform = _controlled.component<Transform>();
+	if (!_enabled)
+		return;
+
+	auto headTransform = _head.component<Transform>();
+	auto bodyTransform = _body.component<Transform>();
+
+	if (headTransform->parent != _body)
+		return;
+		
+	bodyTransform->globalRotate(glm::quat({ 0.0, 0.0, -_mousePos.x * dt }));
+
+	_xAngle -= _mousePos.y * dt;
+	_xAngle = glm::clamp(_xAngle, -glm::half_pi<float>(), glm::half_pi<float>());
 	
-	transform->globalRotate(glm::quat({ 0.0, 0.0, -_mousePos.x * dt }));
-	transform->localRotate(glm::quat({ -_mousePos.y * dt, 0.0, 0.0 }));
+	headTransform->rotation = glm::quat(glm::vec3{ _xAngle, 0, 0 });
 	
-	float moveSpeed = 300.f * dt;
+	float moveSpeed = 2000.f * dt;
 	
 	if (_boost)
-		moveSpeed = 1000.f * dt;	
+		moveSpeed *= 2;	
 
-	transform->localTranslate(Transform::forward * _flash * 100.f);
+	//bodyTransform->localTranslate(Transform::forward * _flash * 100.f);
 	
 	if (_forward)
-		transform->localTranslate(Transform::forward * (float)moveSpeed);
+		bodyTransform->localTranslate(Transform::forward * (float)moveSpeed);
 	if (_back)
-		transform->localTranslate(Transform::back * (float)moveSpeed);
+		bodyTransform->localTranslate(Transform::back * (float)moveSpeed);
 	if (_left)
-		transform->localTranslate(Transform::left * (float)moveSpeed);
+		bodyTransform->localTranslate(Transform::left * (float)moveSpeed);
 	if (_right)
-		transform->localTranslate(Transform::right * (float)moveSpeed);
-	if (_up)
-		transform->globalTranslate(Transform::up * (float)moveSpeed);
-	if (_down)
-		transform->globalTranslate(Transform::down * (float)moveSpeed);
+		bodyTransform->localTranslate(Transform::right * (float)moveSpeed);
 
-	_flash = 0;
+	//_flash = 0;
 	_mousePos = { 0.0, 0.0 };
+		
+	if (!_touchingCount)
+		return;
 
-	_keepUpright();
+	if (!_body.has_component<Collider>()) {
+		if (_up)
+			bodyTransform->localTranslate(Transform::up * (float)moveSpeed);
+		if (_down)
+			bodyTransform->localTranslate(Transform::down * (float)moveSpeed);
+
+		return;
+	}
+
+	if (_up) {
+		if (!_jumped) {
+			_jumped = true;
+
+			auto collider = _body.component<Collider>();
+			collider->rigidBody->setLinearVelocity(btVector3(0, 0, 2000));
+		}
+	}
+	else if (!_up && _jumped) {
+		_jumped = false;
+	}
 }
 
 void Controller::receive(const CursorEnterEvent& cursorEnterEvent){
@@ -114,10 +130,20 @@ void Controller::receive(const ScrollWheelEvent& scrollWheelEvent){
 	_flash = scrollWheelEvent.offset.y;
 }
 
-void Controller::receive(const PhysicsUpdateEvent& physicsUpdateEvent) {
-	_keepUpright();
+void Controller::receive(const CollidingEvent& collidingEvent){
+	if (collidingEvent.contactEvent.firstEntity == _body || collidingEvent.contactEvent.secondEntity == _body) {
+		if (collidingEvent.colliding)
+			_touchingCount++;
+		else
+			_touchingCount--;
+	}
 }
 
-void Controller::setControlled(entityx::Entity entity){
-	_controlled = entity;
+void Controller::setEnabled(bool enabled){
+	_enabled = enabled;
+}
+
+void Controller::setControlled(entityx::Entity head, entityx::Entity body){
+	_head = head;
+	_body = body;
 }
