@@ -1,18 +1,19 @@
 function("download_extract_tar" folder url)
-	if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${folder}")
-		file(DOWNLOAD "${url}" "${CMAKE_CURRENT_SOURCE_DIR}/${folder}.tar.gz")
+	file(DOWNLOAD "${url}" "${CMAKE_CURRENT_SOURCE_DIR}/${folder}.tar.gz")
 
-		execute_process(
-			COMMAND "${CMAKE_COMMAND}" -E tar xzf "${folder}.tar.gz"
-			WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-		)
+	execute_process(
+		COMMAND "${CMAKE_COMMAND}" -E tar xzf "${folder}.tar.gz"
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+	)
 
-		file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${folder}.tar.gz")
-	endif()
+	file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${folder}.tar.gz")
 endfunction("download_extract_tar")
 
 function("add_external_tar" folder url cmake)
-	download_extract_tar("${folder}" "${url}")
+	if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${folder}")
+		download_extract_tar("${folder}" "${url}")
+	endif()
+	
 	add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/${folder}/${cmake}")
 endfunction("add_external_tar")
 

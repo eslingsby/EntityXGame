@@ -137,6 +137,15 @@ target_compile_options("BulletCollision" PUBLIC "/wd5033")
 target_compile_options("LinearMath" PUBLIC "/wd5033")
 target_compile_options("LinearMath" PUBLIC "/wd4305")
 
+# DearImgui
+if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imgui-1.69/imgui.h")
+	download_extract_tar("imgui-1.69" "https://github.com/ocornut/imgui/archive/v1.69.tar.gz")
+endif()
+
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/imgui-1.69/")
+
+set_target_properties("imgui" PROPERTIES FOLDER "Thirdparty")
+
 # RapidJson
 #option(RAPIDJSON_BUILD_DOC "" OFF)
 #option(RAPIDJSON_BUILD_EXAMPLES "" OFF)

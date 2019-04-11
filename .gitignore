@@ -11,3 +11,7 @@ thirdparty/*
 !thirdparty/stb
 thirdparty/stb/*
 !thirdparty/stb/CMakeLists.txt
+
+!thirdparty/imgui-1.69
+thirdparty/imgui-1.69/*
+!thirdparty/imgui-1.69/CMakeLists.txt
