@@ -71,7 +71,7 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 			_jumped = true;
 
 			auto collider = _body.component<Collider>();
-			collider->rigidBody->setLinearVelocity(btVector3(0, 0, 2000));
+			collider->setLinearVelocity({ 0, 0, 2000 });
 		}
 	}
 	else if (!_up && _jumped) {

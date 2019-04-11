@@ -34,7 +34,4 @@ public:
 
 	void receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent);
 	void receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent);
-
-	friend void contactStartedCallback(btPersistentManifold* const&);
-	friend void contactEndedCallback(btPersistentManifold* const&);
 };

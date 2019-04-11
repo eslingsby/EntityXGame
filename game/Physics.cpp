@@ -4,41 +4,31 @@
 #include "Transform.hpp"
 #include "PhysicsEvents.hpp"
 
-/*
-typedef bool (*ContactDestroyedCallback)(void* userPersistentData);
-typedef bool (*ContactProcessedCallback)(btManifoldPoint& cp, void* body0, void* body1);
-typedef void (*ContactStartedCallback)(btPersistentManifold* const& manifold);
-typedef void (*ContactEndedCallback)(btPersistentManifold* const& manifold);
-
-typedef bool (*ContactAddedCallback)(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1);
-extern ContactAddedCallback gContactAddedCallback;
-
-///This is to allow MaterialCombiner/Custom Friction/Restitution values
-ContactAddedCallback gContactAddedCallback = 0;
-*/
-
 std::vector<CollidingEvent> collidingEvents;
 std::vector<ContactEvent> contactEvents;
 
 void contactStartedCallback(btPersistentManifold* const& manifold) {
-	Collider* collider0 = (Collider*)manifold->getBody0()->getUserPointer();
-	Collider* collider1 = (Collider*)manifold->getBody1()->getUserPointer();
+	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	collidingEvents.push_back(CollidingEvent{ true, ContactEvent{ collider0->self, collider1->self } });
+	if (firstCollider->bodyInfo.callbacks)
+		collidingEvents.push_back(CollidingEvent{ true, ContactEvent{ firstCollider->self, secondCollider->self } });
 }
 
 void contactEndedCallback(btPersistentManifold* const& manifold) {
-	Collider* collider0 = (Collider*)manifold->getBody0()->getUserPointer();
-	Collider* collider1 = (Collider*)manifold->getBody1()->getUserPointer();
+	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	collidingEvents.push_back(CollidingEvent{ false, ContactEvent{collider0->self, collider1->self} });
+	if (firstCollider->bodyInfo.callbacks)
+		collidingEvents.push_back(CollidingEvent{ false, ContactEvent{ firstCollider->self, secondCollider->self} });
 }
 
 bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
-	Collider* collider0 = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
-	Collider* collider1 = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
+	Collider* firstCollider = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
+	Collider* secondCollider = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
 
-	contactEvents.push_back(ContactEvent{ collider0->self, collider1->self });
+	if (firstCollider->bodyInfo.callbacks)
+		contactEvents.push_back(ContactEvent{ firstCollider->self, secondCollider->self });
 
 	return false;
 }
@@ -50,7 +40,7 @@ Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(cons
 	_solver = new btSequentialImpulseConstraintSolver;
 	_dynamicsWorld = new btDiscreteDynamicsWorld(_dispatcher, _overlappingPairCache, _solver, _collisionConfiguration);
 
-	_dynamicsWorld->setGravity(toBt(_constructorInfo.defaultGravity));
+	setGravity(_constructorInfo.defaultGravity);
 
 	gContactAddedCallback = contactAddedCallback;
 	gContactStartedCallback = contactStartedCallback;
@@ -60,16 +50,12 @@ Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(cons
 Physics::~Physics(){
 	if (_dynamicsWorld)
 		delete _dynamicsWorld;
-
 	if (_solver)
 		delete _solver;
-
 	if (_overlappingPairCache)
 		delete _overlappingPairCache;
-
 	if (_dispatcher)
 		delete _dispatcher;
-
 	if (_collisionConfiguration)
 		delete _collisionConfiguration;
 }
@@ -77,33 +63,11 @@ Physics::~Physics(){
 void Physics::configure(entityx::EventManager & events){
 	events.subscribe<entityx::ComponentAddedEvent<Collider>>(*this);
 	events.subscribe<entityx::ComponentRemovedEvent<Collider>>(*this);
-
-	//_eventsPtr = &events;
 }
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
+	// Copy over transform data to collider
 	for (auto entity : entities.entities_with_components<Transform, Collider>()) {
-		//glm::vec3 globalPosition;
-		//glm::quat globalRotation;
-		//
-		//entity.component<Transform>()->globalDecomposed(&globalPosition, &globalRotation);
-		//
-		////glm::mat4 globalMatrix = entity.component<Transform>()->globalMatrix();
-		//
-		//btTransform colliderTransform;
-		//
-		////olliderTransform.setFromOpenGLMatrix((btScalar*)&globalMatrix[0]);
-		//
-		//colliderTransform.setOrigin(toBt(globalPosition));
-		//colliderTransform.setRotation(toBt(globalRotation));
-		//
-		//auto collider = entity.component<Collider>();
-		//
-		//collider->rigidBody->setWorldTransform(colliderTransform);
-		//
-		////collider->rigidBody->setSca
-	
-
 		auto transform = entity.component<Transform>();
 		auto collider = entity.component<Collider>();
 		
@@ -117,10 +81,10 @@ void Physics::update(entityx::EntityManager & entities, entityx::EventManager & 
 		newTransform.setOrigin(toBt(globalPosition));
 		newTransform.setRotation(toBt(globalRotation));
 
-		collider->rigidBody->setWorldTransform(newTransform);
-	
+		collider->rigidBody.setWorldTransform(newTransform);
 	}
 
+	// Step the simulation, emitting events each step
 	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++) {
 		_dynamicsWorld->stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
 
@@ -147,82 +111,95 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 
 	collider->self = colliderAddedEvent.entity;
 
+	btTransform shapeTransform;
+	shapeTransform.setIdentity();
+
 	const Collider::ShapeInfo& shapeInfo = collider->shapeInfo;
 
 	switch (collider->shapeInfo.type) {
 	case Collider::Sphere:
-		collider->collisionShape = new btSphereShape(shapeInfo.a);
+		//collider->collisionShape = new btSphereShape(shapeInfo.a * .5f);
+		collider->shapeVariant = btSphereShape(shapeInfo.a * .5f);
 		break;
 	case Collider::Box:
-		collider->collisionShape = new btBoxShape(btVector3(shapeInfo.a, shapeInfo.b, shapeInfo.c));
+		//collider->collisionShape = new btBoxShape(btVector3(shapeInfo.a * .5f, shapeInfo.b * .5f, shapeInfo.c * .5f));
+		collider->shapeVariant = btBoxShape(btVector3(shapeInfo.a * .5f, shapeInfo.b * .5f, shapeInfo.c * .5f));
 		break;
 	case Collider::Plane:
-		collider->collisionShape = new btStaticPlaneShape(btVector3(shapeInfo.a, shapeInfo.b, shapeInfo.c), shapeInfo.d);
+		//collider->collisionShape = new btStaticPlaneShape(btVector3(0, 0, 1), 1);
+		collider->shapeVariant = btStaticPlaneShape(btVector3(0, 0, 1), 1);
 		break;
 	case Collider::Capsule:
-		collider->collisionShape = new btCapsuleShapeZ(shapeInfo.a, shapeInfo.b);
+		//collider->collisionShape = new btCapsuleShapeZ(shapeInfo.a * .5f, shapeInfo.b);
+		collider->shapeVariant = btCapsuleShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		break;
 	case Collider::Cylinder:
-		collider->collisionShape = new btCylinderShape(btVector3(shapeInfo.a, shapeInfo.b, shapeInfo.c));
+		//collider->collisionShape = new btCylinderShapeZ(btVector3(shapeInfo.a * .5f, shapeInfo.a * .5f, shapeInfo.b * .5f));
+		collider->shapeVariant = btCylinderShapeZ(btVector3(shapeInfo.a * .5f, shapeInfo.a * .5f, shapeInfo.b * .5f));
+		break;
+	case Collider::Cone:
+		//collider->collisionShape = new btConeShapeZ(shapeInfo.a * .5f, shapeInfo.b);
+		collider->shapeVariant = btConeShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		break;
 	}
-
-	btVector3 localInertia(0.f, 0.f, 0.f);
-
-	float mass = collider->bodyInfo.mass;
 	
-	if (collider->bodyInfo.type == Collider::Static || collider->bodyInfo.type == Collider::Trigger)
-		mass = 0.f;
+	btVector3 localInertia(0.f, 0.f, 0.f);
+	float mass = collider->bodyInfo.mass;
+
+	//if (collider->bodyInfo.type == Collider::Static || collider->bodyInfo.type == Collider::Trigger)
+	//	mass = 0.f;
+
+	btCollisionShape* shape;// = collider->collisionShape;
+
+	std::visit([&](btCollisionShape& visitShape) {
+		shape = &visitShape;
+	}, collider->shapeVariant);
+
+	if (colliderAddedEvent.entity.has_component<Transform>() && collider->shapeInfo.type != Collider::Plane) {
+		auto transform = colliderAddedEvent.entity.component<const Transform>();
+		shape->setLocalScaling(toBt(transform->scale));
+	}
 
 	if (mass != 0.f)
-		collider->collisionShape->calculateLocalInertia(mass, localInertia);
+		shape->calculateLocalInertia(collider->bodyInfo.mass, localInertia);
 
-	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, (btMotionState*)collider.get(), collider->collisionShape, localInertia);
-	collider->rigidBody = new btRigidBody(rbInfo);
-
-	//collider->rigidBody->setGravity(toBt(collider->bodyInfo.gravity));
-	collider->rigidBody->setUserPointer(collider.get());
+	collider->rigidBody = btRigidBody(mass, (btMotionState*)collider.get(), shape, localInertia);
+	collider->rigidBody.setUserPointer(collider.get());
 
 	switch (collider->bodyInfo.type) {
-	//case Collider::Kinematic:
-	//	collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
-	//	break;
-
 	case Collider::Static:
-		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
 		break;
-
 	case Collider::StaticTrigger:
-		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT | btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT | btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
 		break;
-
 	case Collider::Trigger:
-		collider->rigidBody->setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
 		break;
 	}
 
-	collider->rigidBody->setAngularFactor(toBt(collider->bodyInfo.defaultAngularFactor));
-	collider->rigidBody->setAngularFactor(toBt(collider->bodyInfo.defaultAngularFactor));
-	collider->rigidBody->setAngularVelocity(toBt(collider->bodyInfo.startingAngularVelocity));
-	collider->rigidBody->setAngularVelocity(toBt(collider->bodyInfo.startingLinearVelocity));
+	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
+	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
+	collider->setFriction(collider->bodyInfo.defaultFriction);
+	collider->setRestitution(collider->bodyInfo.defaultRestitution);
 
-	if (collider->bodyInfo.alwaysActive)// || collider->bodyInfo.type == Collider::Trigger || collider->bodyInfo.type == Collider::StaticTrigger)
+	collider->setAngularVelocity(collider->bodyInfo.startingAngularVelocity);
+	collider->setAngularVelocity(collider->bodyInfo.startingLinearVelocity);
+
+	if (collider->bodyInfo.alwaysActive)
 		collider->setAlwaysActive(true);
 
 	if (collider->bodyInfo.callbacks)
-		collider->rigidBody->setCollisionFlags(collider->rigidBody->getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK);
-	
-	_dynamicsWorld->addRigidBody(collider->rigidBody);
+		collider->rigidBody.setCollisionFlags(collider->rigidBody.getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK);
+
+	_dynamicsWorld->addRigidBody(&collider->rigidBody);
 }
 
 void Physics::receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent){
 	auto collider = colliderRemovedEvent.component;
 
-	_dynamicsWorld->removeRigidBody(collider->rigidBody);
-
-	if (collider->rigidBody)
-		delete collider->rigidBody;
-
-	if (collider->collisionShape)
-		delete collider->collisionShape;
+	_dynamicsWorld->removeRigidBody(&collider->rigidBody);
+	
+	//if (collider->collisionShape)
+	//	delete collider->collisionShape;
 }

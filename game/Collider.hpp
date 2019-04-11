@@ -1,9 +1,14 @@
 #pragma once
 
-#include <LinearMath\btMotionState.h>
 #include <entityx\Entity.h>
+
 #include <glm\gtx\matrix_decompose.hpp>
+
+#include <LinearMath\btMotionState.h>
 #include <btBulletDynamicsCommon.h>
+
+#include <optional>
+#include <variant>
 
 #include "Transform.hpp"
 
@@ -25,28 +30,38 @@ inline btVector3 toBt(const glm::vec3& from) {
 
 struct Collider : public btMotionState {
 	enum ShapeType {
-		Sphere, // a = radius
+		Sphere, // a = diameter
 		Box, // a = width, b = height, c = depth
-		Cylinder, // a = radius, b = height
-		Capsule, // a = radius, b = height
+		Cylinder, // a = diameter, b = height
+		Capsule, // a = diameter, b = height
+		Cone, // a = diameter, b = height
 		Plane
 	};
+
+	using ShapeVariant = std::variant<
+		btSphereShape,
+		btBoxShape,
+		btCylinderShapeZ,
+		btCapsuleShapeZ,
+		btConeShapeZ,
+		btStaticPlaneShape
+	>;
 
 	enum BodyType {
 		Dynamic,
 		Static,
-		//Kinematic,
 		Trigger,
-		StaticTrigger
+		StaticTrigger,
+		//Kinematic,
 	};
 
 	struct ShapeInfo {
 		ShapeType type = Sphere;
 
-		float a = 0.f;
-		float b = 0.f;
-		float c = 0.f;
-		float d = 0.f;
+		float a = 1.f;
+		float b = 1.f;
+		float c = 1.f;
+		float d = 1.f;
 	};
 
 	struct BodyInfo {
@@ -64,8 +79,12 @@ struct Collider : public btMotionState {
 
 		glm::vec3 centerOfMass;
 
-		//float friction = 0.5f;
-		//float restitution = 0.f;
+		float defaultFriction = 0.5f;
+		float defaultRestitution = 0.5f;
+
+		//bool overrideGravity = false;
+		//glm::vec3 defaultGravity;
+
 		//float linearThreshold = 1.f;
 		//float angularThreshold = 0.8f;
 	};
@@ -75,9 +94,11 @@ struct Collider : public btMotionState {
 	const ShapeInfo shapeInfo;
 	const BodyInfo bodyInfo;
 
-	btCollisionShape* collisionShape = nullptr;
-	btRigidBody* rigidBody = nullptr;
+	//btCollisionShape* collisionShape = nullptr;
 
+	ShapeVariant shapeVariant;
+	btRigidBody rigidBody;
+	
 	Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo = BodyInfo());
 
 	void getWorldTransform(btTransform& worldTransform) const final;
@@ -89,4 +110,7 @@ struct Collider : public btMotionState {
 	void setAngularVelocity(const glm::vec3& velocity);
 	void setLinearFactor(const glm::vec3& factor);
 	void setAngularFactor(const glm::vec3& factor);
+	void setFriction(float friction);
+	void setRestitution(float restitution);
+	void setGravity(const glm::vec3& gravity);
 };

@@ -1,9 +1,10 @@
 #include "Collider.hpp"
 
-Collider::Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo) : shapeInfo(shapeInfo), bodyInfo(bodyInfo) { };
+Collider::Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo) : shapeInfo(shapeInfo), bodyInfo(bodyInfo), shapeVariant(0), rigidBody(0, 0, 0) { };
+
 
 void Collider::getWorldTransform(btTransform& worldTransform) const {
-	if (!self.has_component<Transform>())
+	if (!self.valid() || !self.has_component<Transform>())
 		return;
 
 	auto transform = self.component<const Transform>();
@@ -18,7 +19,7 @@ void Collider::getWorldTransform(btTransform& worldTransform) const {
 }
 
 void Collider::setWorldTransform(const btTransform& worldTransform) {
-	if (!self.has_component<Transform>())
+	if (!self.valid() || !self.has_component<Transform>())
 		return;
 
 	auto transform = self.component<Transform>();
@@ -27,12 +28,12 @@ void Collider::setWorldTransform(const btTransform& worldTransform) {
 	glm::quat globalRotation = fromBt(worldTransform.getRotation());
 
 	if (transform->parent.valid() && transform->parent.has_component<Transform>()) {
-		glm::vec3 parentGlobalPosition;
-		glm::quat parentGlobalRotation;
-		
-		transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
-		
-		transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
+		//glm::vec3 parentGlobalPosition;
+		//glm::quat parentGlobalRotation;
+		//
+		//transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
+		//
+		//transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
 		//transform->rotation = glm::inverse(parentGlobalRotation) * transform->rotation; // Colliders as children need fixing!
 	}
 	else {
@@ -42,34 +43,40 @@ void Collider::setWorldTransform(const btTransform& worldTransform) {
 }
 
 void Collider::setActive(bool active){
-	assert(rigidBody);
-	rigidBody->activate(active);
+	rigidBody.activate(active);
 }
 
 void Collider::setAlwaysActive(bool alwaysActive){
-	assert(rigidBody);
 	if (alwaysActive)
-		rigidBody->setActivationState(DISABLE_DEACTIVATION);
+		rigidBody.setActivationState(DISABLE_DEACTIVATION);
 	else
-		rigidBody->setActivationState(ACTIVE_TAG);
+		rigidBody.setActivationState(ACTIVE_TAG);
 }
 
 void Collider::setLinearVelocity(const glm::vec3& velocity){
-	assert(rigidBody);
-	rigidBody->setLinearVelocity(toBt(velocity));
+	rigidBody.setLinearVelocity(toBt(velocity));
 }
 
 void Collider::setAngularVelocity(const glm::vec3& velocity) {
-	assert(rigidBody);
-	rigidBody->setAngularVelocity(toBt(velocity));
+	rigidBody.setAngularVelocity(toBt(velocity));
 }
 
 void Collider::setLinearFactor(const glm::vec3 & factor){
-	assert(rigidBody);
-	rigidBody->setLinearFactor(toBt(factor));
+	rigidBody.setLinearFactor(toBt(factor));
 }
 
 void Collider::setAngularFactor(const glm::vec3 & factor){
-	assert(rigidBody);
-	rigidBody->setAngularFactor(toBt(factor));
+	rigidBody.setAngularFactor(toBt(factor));
+}
+
+void Collider::setFriction(float friction){
+	rigidBody.setFriction(friction);
+}
+
+void Collider::setRestitution(float restitution){
+	rigidBody.setRestitution(restitution);
+}
+
+void Collider::setGravity(const glm::vec3 & gravity){
+	rigidBody.setGravity(toBt(gravity));
 }
