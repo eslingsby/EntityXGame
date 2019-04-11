@@ -29,33 +29,19 @@ inline T deltaTime(const TimePoint& point) {
 }
 
 /*
-- Colliders as children
-- BtCollisionShape sharing
+To-do:
 
-- Naming, find in child system / hierarchy helper
+- Transform global translate/rotate/scale relative to parent
+
+- Dynamic collision shape scaling
+
+- Naming, find in child system, get root / hierarchy helper
 
 - Audio for physics events
+
+- Working keyboard input in imgui
+- Raycasting from view / moving axis object
 */
-
-void _createTower(entityx::EntityManager& entities, std::vector<entityx::Entity>& sandbox, uint32_t count, float spin = 2.f, float width = 200000, float depth = 20000, float height = 10000) {
-	for (uint32_t i = 0; i < count; i++) {
-		entityx::Entity box = entities.create();
-	
-		auto transform = box.assign<Transform>();
-		transform->position = { 0.f, 0.f, (height / 2.f) + height * i };
-		transform->scale = { depth, width, height };
-	
-		transform->rotation = glm::quat({ 0.f, 0.f, glm::radians(i * (360.f / count) * spin) });
-	
-		box.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "wood.png" });
-	
-		auto collider = box.assign<Collider>(Collider::ShapeInfo{ Collider::Box }, Collider::BodyInfo{ Collider::Dynamic, 100 });
-	
-		//collider->setActive(false);
-
-		sandbox.push_back(box);
-	}
-}
 
 Game::Game(int argc, char** argv){
 	auto path = std::experimental::filesystem::path(argv[0]).replace_filename("data/");
@@ -97,7 +83,7 @@ Game::Game(int argc, char** argv){
 	// Setup Test entities
 	_spawnLocation = { 0, -5000, 0 };
 	
-	// Camera
+	// Camera (body has collider, head has camera. Head is child of body)
 	{	
 		// Body (physics + z axis rotation)
 		_body = entities.create();
@@ -137,44 +123,81 @@ Game::Game(int argc, char** argv){
 		systems.system<Interface>()->setFocusedEntity(_body);
 	}
 
-	// Testing ball
-	//for (uint32_t i = 0; i < 2; i++){
-	//	entityx::Entity ball = entities.create();
-	//
-	//	auto transform = ball.assign<Transform>();
-	//	transform->scale = { 500, 500, 500 };
-	//	transform->position = _spawnLocation + glm::vec3{ 0, 1000, 1000 + 1000 * i };
-	//
-	//	//transform->position = { 0, 10000, 500 };
-	//	//transform->parent = _head;
-	//			
-	//	auto model = ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
-	//
-	//	ball.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, Collider::BodyInfo{ Collider::Dynamic, 10.f });
-	//}
-
-	// Helix tower (for fun)
-	//_createTower(entities, _sandbox, 50, 10, 10000, 5000, 1000);
-
-	// Testing triangle room
-	//{	
-	//	entityx::Entity scene = entities.create();
-	//
-	//	auto transform = scene.assign<Transform>();
-	//	transform->scale = { 5, 5, 5 };
-	//	transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
-	//
-	//	systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
-	//}
-
-	// Axis
+	// Axis (with collider for each axis)
 	{
+		// Axis root
 		entityx::Entity axis = entities.create();
+
+		auto axisTransform = axis.assign<Transform>();
+		axisTransform->position = { 0, 0, 1000 };
+		axisTransform->scale = { 5, 5, 5 };
 	
-		auto transform = axis.assign<Transform>();
-		transform->scale = { 50, 50, 50 };
+		// Axis visual
+		entityx::Entity axisVisual = entities.create();
+		
+		auto axisVisualTransform = axisVisual.assign<Transform>();
+		axisVisualTransform->parent = axis;
+		axisVisualTransform->scale = { 50, 50, 50 };
 	
-		//axis.assign<Model>(Model::FilePaths{ "axis.obj", 0, "rgb.png" });
+		axisVisual.assign<Model>(Model::FilePaths{ "axis.obj", 0, "rgb.png" });
+
+		// Shared variables
+		glm::vec3 colliderScale = { 50, 50, 475 };
+
+		Collider::ShapeInfo shapeInfo;
+		shapeInfo.type = Collider::Cylinder;
+
+		// X collider
+		entityx::Entity xAxis = entities.create();
+
+		auto xTransform = xAxis.assign<Transform>();
+		xTransform->parent = axis;
+		xTransform->rotation = glm::quat(glm::radians(glm::vec3{ 0.f, 90.f, 0.f }));
+		xTransform->scale = colliderScale;
+		xTransform->position = { colliderScale.z / 2, 0, 0 };
+
+		//xAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
+		xAxis.assign<Collider>(shapeInfo);
+
+		// Y collider
+		entityx::Entity yAxis = entities.create();
+		
+		auto yTransform = yAxis.assign<Transform>();
+		yTransform->parent = axis;
+		yTransform->position = { 0, colliderScale.z / 2, 0 };
+		yTransform->scale = colliderScale;
+		yTransform->rotation = glm::quat(glm::radians(glm::vec3{ 90.f, 0.f, 0.f }));
+		
+		//yAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
+		yAxis.assign<Collider>(shapeInfo);
+		
+		// Z collider
+		entityx::Entity zAxis = entities.create();
+		
+		auto zTransform = zAxis.assign<Transform>();
+		zTransform->parent = axis;
+		zTransform->position = { 0, 0, colliderScale.z / 2 };
+		zTransform->scale = colliderScale;
+		
+		//zAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
+		zAxis.assign<Collider>(shapeInfo);
+	}
+
+	// Testing ball (child of head)
+	{
+		entityx::Entity ball = entities.create();
+
+		auto transform = ball.assign<Transform>();
+		transform->parent = _head;
+		transform->position = { 0.f, 1000.f, 0.f };
+		transform->scale = { 100, 100, 100 };
+
+		ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.alwaysActive = true;
+
+		ball.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
 	}
 
 	// Floor
@@ -187,12 +210,7 @@ Game::Game(int argc, char** argv){
 
 		plane.assign<Model>(Model::FilePaths{ "shapes/plane.obj", 0, "checker.png" });
 
-		Collider::BodyInfo bodyInfo;
-		bodyInfo.type = Collider::Static;
-		//bodyInfo.defaultRestitution = 1.f;
-		bodyInfo.mass = 0;
-
-		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane }, bodyInfo);
+		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane });
 	}
 
 	// Skybox
@@ -204,6 +222,17 @@ Game::Game(int argc, char** argv){
 
 		skybox.assign<Model>(Model::FilePaths{ "skybox.obj", 0, "skybox.png" });
 	}
+
+	// Testing triangle room
+	//{	
+	//	entityx::Entity scene = entities.create();
+	//
+	//	auto transform = scene.assign<Transform>();
+	//	transform->scale = { 5, 5, 5 };
+	//	transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
+	//
+	//	systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
+	//}
 }
 
 void Game::receive(const WindowFocusEvent& windowFocusEvent){
@@ -235,6 +264,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		return;
 	}
 
+	// Create a bunch of junk on mouse events (testing)
 	if (mousePressEvent.action != Action::Press)
 		return;
 
@@ -259,7 +289,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 	Collider::BodyInfo bodyInfo;
 
 	switch (mousePressEvent.button) {
-	case 1: // left mouse
+	case 1: 
+		// left mouse (heavy anvil)
 		transform->scale = { 1000.f, 1000.f, 1000.f };
 		model = testent.assign<Model>(Model::FilePaths{ "anvil.obj", 0, "anvil.png" });
 
@@ -269,7 +300,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5f, 1.5f, 1.5f }, bodyInfo);
 		break;
 
-	case 2: // middle mouse
+	case 2: // middle mouse (bouncy ball)
 		transform->scale = { 500.f, 500.f, 500.f };
 		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
 
@@ -278,7 +309,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
 		break;
 
-	case 3: // right mouse
+	case 3: // right mouse (light pizza box)
 		transform->scale = { 700.f, 700.f, 100.f };
 		model = testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "pizza.png" });
 
@@ -296,6 +327,7 @@ void Game::receive(const WindowOpenEvent& windowOpenEvent){
 void Game::receive(const KeyInputEvent& keyInputEvent){
 	switch (keyInputEvent.key) {
 	case Key_Escape:
+		// unlock mouse, or quit
 		if (keyInputEvent.action != Action::Press)
 			return;
 
@@ -310,7 +342,8 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 
 		return;
 
-	case Key_R:
+	case Key_R: 
+		// clean-up
 		if (keyInputEvent.action != Action::Release)
 			return;
 
@@ -318,12 +351,11 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 			entity.destroy();
 
 		_sandbox.clear();
-		
-		//_createTower(entities, _sandbox, 100, 10, 10000, 5000, 500);
 
 		return;
 
 	case Key_T:
+		// respawn
 		if (keyInputEvent.action != Action::Release)
 			return;
 

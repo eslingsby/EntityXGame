@@ -34,4 +34,6 @@ public:
 
 	void receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent);
 	void receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent);
+
+	void rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<entityx::Entity>& hits);
 };

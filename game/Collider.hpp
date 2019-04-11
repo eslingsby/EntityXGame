@@ -48,10 +48,10 @@ struct Collider : public btMotionState {
 	>;
 
 	enum BodyType {
-		Dynamic,
-		Static,
+		Solid,
 		Trigger,
-		StaticTrigger,
+		//Static,
+		//StaticTrigger,
 		//Kinematic,
 	};
 
@@ -65,7 +65,7 @@ struct Collider : public btMotionState {
 	};
 
 	struct BodyInfo {
-		BodyType type = Dynamic;
+		BodyType type = Solid;
 		float mass = 0.f;
 
 		bool alwaysActive = false;
@@ -93,8 +93,6 @@ struct Collider : public btMotionState {
 
 	const ShapeInfo shapeInfo;
 	const BodyInfo bodyInfo;
-
-	//btCollisionShape* collisionShape = nullptr;
 
 	ShapeVariant shapeVariant;
 	btRigidBody rigidBody;

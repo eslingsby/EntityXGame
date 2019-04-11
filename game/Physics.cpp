@@ -1,6 +1,8 @@
 #include "Physics.hpp"
 
 #include <btBulletCollisionCommon.h>
+#include <BulletCollision\NarrowPhaseCollision\btRaycastCallback.h>
+
 #include "Transform.hpp"
 #include "PhysicsEvents.hpp"
 
@@ -118,38 +120,26 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 
 	switch (collider->shapeInfo.type) {
 	case Collider::Sphere:
-		//collider->collisionShape = new btSphereShape(shapeInfo.a * .5f);
 		collider->shapeVariant = btSphereShape(shapeInfo.a * .5f);
 		break;
 	case Collider::Box:
-		//collider->collisionShape = new btBoxShape(btVector3(shapeInfo.a * .5f, shapeInfo.b * .5f, shapeInfo.c * .5f));
 		collider->shapeVariant = btBoxShape(btVector3(shapeInfo.a * .5f, shapeInfo.b * .5f, shapeInfo.c * .5f));
 		break;
 	case Collider::Plane:
-		//collider->collisionShape = new btStaticPlaneShape(btVector3(0, 0, 1), 1);
 		collider->shapeVariant = btStaticPlaneShape(btVector3(0, 0, 1), 1);
 		break;
 	case Collider::Capsule:
-		//collider->collisionShape = new btCapsuleShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		collider->shapeVariant = btCapsuleShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		break;
 	case Collider::Cylinder:
-		//collider->collisionShape = new btCylinderShapeZ(btVector3(shapeInfo.a * .5f, shapeInfo.a * .5f, shapeInfo.b * .5f));
 		collider->shapeVariant = btCylinderShapeZ(btVector3(shapeInfo.a * .5f, shapeInfo.a * .5f, shapeInfo.b * .5f));
 		break;
 	case Collider::Cone:
-		//collider->collisionShape = new btConeShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		collider->shapeVariant = btConeShapeZ(shapeInfo.a * .5f, shapeInfo.b);
 		break;
 	}
-	
-	btVector3 localInertia(0.f, 0.f, 0.f);
-	float mass = collider->bodyInfo.mass;
 
-	//if (collider->bodyInfo.type == Collider::Static || collider->bodyInfo.type == Collider::Trigger)
-	//	mass = 0.f;
-
-	btCollisionShape* shape;// = collider->collisionShape;
+	btCollisionShape* shape;
 
 	std::visit([&](btCollisionShape& visitShape) {
 		shape = &visitShape;
@@ -157,26 +147,23 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 
 	if (colliderAddedEvent.entity.has_component<Transform>() && collider->shapeInfo.type != Collider::Plane) {
 		auto transform = colliderAddedEvent.entity.component<const Transform>();
-		shape->setLocalScaling(toBt(transform->scale));
+
+		glm::vec3 globalScale;
+		transform->globalDecomposed(nullptr, nullptr, &globalScale);
+
+		shape->setLocalScaling(toBt(globalScale));
 	}
 
-	if (mass != 0.f)
+	btVector3 localInertia(0.f, 0.f, 0.f);
+
+	if (collider->bodyInfo.mass != 0.f)
 		shape->calculateLocalInertia(collider->bodyInfo.mass, localInertia);
 
-	collider->rigidBody = btRigidBody(mass, (btMotionState*)collider.get(), shape, localInertia);
+	collider->rigidBody = btRigidBody(collider->bodyInfo.mass, (btMotionState*)collider.get(), shape, localInertia);
 	collider->rigidBody.setUserPointer(collider.get());
 
-	switch (collider->bodyInfo.type) {
-	case Collider::Static:
-		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
-		break;
-	case Collider::StaticTrigger:
-		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT | btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
-		break;
-	case Collider::Trigger:
+	if (collider->bodyInfo.type == Collider::Trigger)
 		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
-		break;
-	}
 
 	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
 	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
@@ -199,7 +186,23 @@ void Physics::receive(const entityx::ComponentRemovedEvent<Collider>& colliderRe
 	auto collider = colliderRemovedEvent.component;
 
 	_dynamicsWorld->removeRigidBody(&collider->rigidBody);
-	
-	//if (collider->collisionShape)
-	//	delete collider->collisionShape;
+}
+
+void Physics::rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<entityx::Entity>& hits){
+	btVector3 bFrom(toBt(from));
+	btVector3 bTo(toBt(to));
+
+	btCollisionWorld::AllHitsRayResultCallback results(bFrom, bTo);
+
+	results.m_flags |= btTriangleRaycastCallback::kF_KeepUnflippedNormal;
+	results.m_flags |= btTriangleRaycastCallback::kF_UseSubSimplexConvexCastRaytest;
+
+	_dynamicsWorld->rayTest(bFrom, bTo, results);
+
+	hits.reserve(results.m_collisionObjects.size());
+
+	for (uint32_t i = 0; i < results.m_collisionObjects.size(); i++) {
+		Collider* collider = (Collider*)results.m_collisionObjects[i]->getUserPointer();
+		hits.push_back(collider->self);
+	}
 }

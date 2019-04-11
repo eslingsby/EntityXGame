@@ -39,42 +39,20 @@ glm::mat4 Transform::globalMatrix() const {
 }
 
 void Transform::globalDecomposed(glm::vec3* position, glm::quat* rotation, glm::vec3* scale) const {
-	//glm::vec3 tempPosition;
-	//glm::quat tempRotation;
-	//glm::vec3 tempScale;
-	//
-	//if (!position)
-	//	position = &tempPosition;
-	//if (!rotation)
-	//	rotation = &tempRotation;
-	//if (!scale)
-	//	scale = &tempScale;
-	//
-	//glm::decompose(globalMatrix(), *scale, *rotation, *position, glm::vec3(), glm::vec4());
-
-
-
-
-
-	const Transform* transform = this;
+	glm::vec3 tempPosition;
+	glm::quat tempRotation;
+	glm::vec3 tempScale;
 	
-	if (scale)
-		*scale = { 1.f, 1.f, 1.f };
+	if (!position)
+		position = &tempPosition;
+	if (!rotation)
+		rotation = &tempRotation;
+	if (!scale)
+		scale = &tempScale;
 	
-	do {
-		if (position)
-			*position = transform->position + transform->rotation * *position;
-		if (rotation)
-			*rotation = transform->rotation * *rotation;
-		if (scale)
-			*scale *= transform->scale;
-	
-		if (transform->parent.valid() && transform->parent.has_component<Transform>())
-			transform = transform->parent.component<const Transform>().get();
-		else
-			transform = nullptr;
-	
-	} while (transform);
+	glm::decompose(globalMatrix(), *scale, *rotation, *position, glm::vec3(), glm::vec4());
+
+	*rotation = glm::inverse(*rotation); // not sure why, goes crazy without
 }
 
 void Transform::localRotate(const glm::quat& rotate) {

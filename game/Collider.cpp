@@ -28,13 +28,13 @@ void Collider::setWorldTransform(const btTransform& worldTransform) {
 	glm::quat globalRotation = fromBt(worldTransform.getRotation());
 
 	if (transform->parent.valid() && transform->parent.has_component<Transform>()) {
-		//glm::vec3 parentGlobalPosition;
-		//glm::quat parentGlobalRotation;
-		//
-		//transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
-		//
-		//transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
-		//transform->rotation = glm::inverse(parentGlobalRotation) * transform->rotation; // Colliders as children need fixing!
+		glm::vec3 parentGlobalPosition;
+		glm::quat parentGlobalRotation;
+		
+		transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
+		
+		transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
+		transform->rotation = glm::inverse(parentGlobalRotation) * transform->rotation; // working???
 	}
 	else {
 		transform->position = globalPosition;
