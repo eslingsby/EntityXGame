@@ -26,5 +26,6 @@ endif(MSVC)
 add_subdirectory("game")
 
 if(MSVC)
-	set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT "Game")
+	set_target_properties("Game" PROPERTIES VS_STARTUP_PROJECT "${CMAKE_CURRENT_SOURCE_DIR}")
+	set_target_properties("Game" PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 endif(MSVC)
