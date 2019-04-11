@@ -13,6 +13,8 @@ class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 
 	glm::vec3 _spawnLocation;
 
+	bool _wasHovering = false;
+
 	std::vector<entityx::Entity> _sandbox;
 public:
 	Game(int argc, char** argv);

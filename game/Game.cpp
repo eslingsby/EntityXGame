@@ -68,7 +68,7 @@ Game::Game(int argc, char** argv){
 	rendererInfo.defaultTexture = "checker.png";
 
 	Window::ConstructorInfo windowInfo;
-	windowInfo.debugContext = true;
+	//windowInfo.debugContext = true;
 	windowInfo.defaultWindow.title = "EntityX Game";
 	windowInfo.defaultWindow.lockedCursor = false;
 
@@ -78,9 +78,10 @@ Game::Game(int argc, char** argv){
 	physicsInfo.maxSubSteps = 0;
 
 	// Register systems
-	systems.add<Interface>();
-	systems.add<Renderer>(rendererInfo);
 	systems.add<Window>(windowInfo);
+	systems.add<Renderer>(rendererInfo);
+	systems.add<Interface>();
+
 	systems.add<Controller>();
 	systems.add<Physics>(physicsInfo);
 	systems.add<Audio>();
@@ -128,9 +129,12 @@ Game::Game(int argc, char** argv){
 		headCamera->zDepth = 4000000.f;
 		headCamera->offsetRotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
 
-		// Assign as controlled
+		// Set as controlled
 		systems.system<Controller>()->setControlled(_head, _body);
 		systems.system<Controller>()->setEnabled(false);
+
+		// Set as focused UI entity
+		systems.system<Interface>()->setFocusedEntity(_body);
 	}
 
 	// Testing ball
@@ -185,7 +189,7 @@ Game::Game(int argc, char** argv){
 
 		Collider::BodyInfo bodyInfo;
 		bodyInfo.type = Collider::Static;
-		bodyInfo.defaultRestitution = 1.f;
+		//bodyInfo.defaultRestitution = 1.f;
 		bodyInfo.mass = 0;
 
 		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane }, bodyInfo);
@@ -206,13 +210,28 @@ void Game::receive(const WindowFocusEvent& windowFocusEvent){
 	if (!windowFocusEvent.focused && systems.system<Window>()->windowInfo().lockedCursor) {
 		systems.system<Window>()->lockCursor(false);
 		systems.system<Controller>()->setEnabled(false);
+		systems.system<Interface>()->setInputEnabled(true);
 	}
 }
 
 void Game::receive(const MousePressEvent& mousePressEvent){
+	if (mousePressEvent.action == Action::Press && systems.system<Interface>()->isHovering()) {
+		_wasHovering = true;
+		return;
+	}
+	else if (systems.system<Interface>()->isHovering()) {
+		return;
+	}
+
+	if (_wasHovering && mousePressEvent.action == Action::Release) {
+		_wasHovering = false;
+		return;
+	}
+
 	if (!systems.system<Window>()->windowInfo().lockedCursor) {
 		systems.system<Window>()->lockCursor(true);
 		systems.system<Controller>()->setEnabled(true);
+		systems.system<Interface>()->setInputEnabled(false);
 		return;
 	}
 
@@ -221,6 +240,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 	entityx::Entity testent = entities.create();
 	_sandbox.push_back(testent);
+
+	systems.system<Interface>()->setFocusedEntity(testent);
 
 	auto cameraTransform = _head.component<Transform>();
 
@@ -244,6 +265,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 		bodyInfo.mass = 10000;
 		bodyInfo.defaultFriction = 1;
+		bodyInfo.defaultRestitution = 0;
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5f, 1.5f, 1.5f }, bodyInfo);
 		break;
 
@@ -280,6 +302,7 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 		if (systems.system<Window>()->windowInfo().lockedCursor) {
 			systems.system<Window>()->lockCursor(false);
 			systems.system<Controller>()->setEnabled(false);
+			systems.system<Interface>()->setInputEnabled(true);
 		}
 		else {
 			_running = false;

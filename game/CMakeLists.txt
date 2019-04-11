@@ -15,6 +15,7 @@ target_link_libraries("Game" "sfml-audio")
 target_link_libraries("Game" "LinearMath")
 target_link_libraries("Game" "BulletCollision")
 target_link_libraries("Game" "BulletDynamics")
+target_link_libraries("Game" "imgui")
 #target_link_libraries("Game" "RapidJSON")
 
 #target_link_libraries("Game" winmm.lib)
