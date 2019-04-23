@@ -10,7 +10,7 @@
 #include <optional>
 #include <variant>
 
-#include "Transform.hpp"
+#include "component\Transform.hpp"
 
 inline glm::quat fromBt(const btQuaternion& from) {
 	return glm::quat(from.w(), from.x(), from.y(), from.z());
@@ -84,7 +84,6 @@ struct Collider : public btMotionState {
 
 		//bool overrideGravity = false;
 		//glm::vec3 defaultGravity;
-
 		//float linearThreshold = 1.f;
 		//float angularThreshold = 0.8f;
 	};
@@ -96,11 +95,15 @@ struct Collider : public btMotionState {
 
 	ShapeVariant shapeVariant;
 	btRigidBody rigidBody;
-	
-	Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo = BodyInfo());
 
+	//bool removed = false;
+	
+protected:
 	void getWorldTransform(btTransform& worldTransform) const final;
 	void setWorldTransform(const btTransform& worldTransform) final;
+
+public:
+	Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo = BodyInfo());
 
 	void setActive(bool active);
 	void setAlwaysActive(bool alwaysActive);

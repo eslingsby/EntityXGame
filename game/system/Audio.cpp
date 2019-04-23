@@ -1,4 +1,6 @@
-#include "Audio.hpp"
+#include "system\Audio.hpp"
+
+#include "component\Name.hpp"
 
 Audio::Audio(){ }
 
@@ -14,7 +16,15 @@ void Audio::update(entityx::EntityManager & entities, entityx::EventManager & ev
 }
 
 void Audio::receive(const CollidingEvent & collidingEvent){
+	entityx::Entity entity = collidingEvent.contactEvent.firstEntity;
 
+	if (!entity.has_component<Name>() || entity.component<Name>()->name != "test")
+		return;
+
+	if (collidingEvent.colliding)
+		printf("Colliding!\n");
+	else
+		printf("Not colliding...\n");
 }
 
 void Audio::receive(const ContactEvent & contactEvent){

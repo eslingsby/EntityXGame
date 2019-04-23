@@ -1,7 +1,13 @@
-#include "Collider.hpp"
+#include "component\Collider.hpp"
 
-Collider::Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo) : shapeInfo(shapeInfo), bodyInfo(bodyInfo), shapeVariant(0), rigidBody(0, 0, 0) { };
+#include "component\Name.hpp"
 
+Collider::Collider(ShapeInfo shapeInfo, BodyInfo bodyInfo) : 
+	shapeInfo(shapeInfo), 
+	bodyInfo(bodyInfo), 
+	shapeVariant(0), 
+	rigidBody(0, 0, 0) {
+};
 
 void Collider::getWorldTransform(btTransform& worldTransform) const {
 	if (!self.valid() || !self.has_component<Transform>())
@@ -27,14 +33,34 @@ void Collider::setWorldTransform(const btTransform& worldTransform) {
 	glm::vec3 globalPosition = fromBt(worldTransform.getOrigin());
 	glm::quat globalRotation = fromBt(worldTransform.getRotation());
 
+	glm::mat4 globalMatrix;
+	worldTransform.getOpenGLMatrix((btScalar*)&globalMatrix[0]);
+
+	//if (self.has_component<Name>() && self.component<Name>()->name == "test")
+	//	printf("setWorldTransform\n");
+
 	if (transform->parent.valid() && transform->parent.has_component<Transform>()) {
-		glm::vec3 parentGlobalPosition;
-		glm::quat parentGlobalRotation;
+		//glm::vec3 parentGlobalPosition;
+		//glm::quat parentGlobalRotation;
+		//
+		//transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
+		//
+		//transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
+		//transform->rotation = glm::inverse(parentGlobalRotation) * transform->rotation; // working???
+
+		//glm::mat4 parentMatrix = transform->parent.component<Transform>()->globalMatrix();
+
+		//glm::mat4 localMatrix = glm::inverse(parentMatrix) * globalMatrix;
+		//glm::mat4 localMatrix = globalMatrix * glm::inverse(parentMatrix);
+		//glm::mat4 localMatrix = glm::inverse(globalMatrix) * parentMatrix;
+		//glm::mat4 localMatrix = parentMatrix * glm::inverse(globalMatrix);
+
+		//glm::vec3 localPosition;
+		//glm::quat localRotation;
+		//glm::decompose(localMatrix, glm::vec3(), localRotation, localPosition, glm::vec3(), glm::vec4());
 		
-		transform->parent.component<Transform>()->globalDecomposed(&parentGlobalPosition, &parentGlobalRotation);
-		
-		transform->position = (globalPosition - parentGlobalPosition) * parentGlobalRotation;
-		transform->rotation = glm::inverse(parentGlobalRotation) * transform->rotation; // working???
+		//transform->position = localPosition;
+		//transform->rotation = localRotation;
 	}
 	else {
 		transform->position = globalPosition;

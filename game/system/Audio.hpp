@@ -1,7 +1,8 @@
 #pragma once
 
 #include <entityx\System.h>
-#include "PhysicsEvents.hpp"
+
+#include "system\PhysicsEvents.hpp"
 
 class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 

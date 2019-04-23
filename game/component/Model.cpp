@@ -1,4 +1,4 @@
-#include "Model.hpp"
+#include "component\Model.hpp"
 
 Model::Model(FilePaths filePaths) : filePaths(filePaths) {}
 

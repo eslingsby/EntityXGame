@@ -1,7 +1,9 @@
 #pragma once
 
 #include <entityx\entityx.h>
-#include "WindowEvents.hpp"
+
+#include "system\WindowEvents.hpp"
+
 #include <glm\vec3.hpp>
 
 class Game : public entityx::EntityX, public entityx::Receiver<Game> {

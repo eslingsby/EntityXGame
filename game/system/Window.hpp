@@ -1,16 +1,20 @@
 #pragma once
 
 #include <entityx\System.h>
+
 #include <glad\glad.h>
+
 #include <SDL.h>
 #include <SDL_keyboard.h>
+
 #include <glm\vec2.hpp>
 
 class Window : public entityx::System<Window> {
 	SDL_Window* _window = nullptr;
 	SDL_GLContext _context = nullptr;
 
-	bool _wasOpen = false;
+	bool _open = true;
+	bool _contextWindow = true;
 
 public:
 	struct WindowInfo {
@@ -35,7 +39,10 @@ private:
 	const ConstructorInfo _constructorInfo;
 	WindowInfo _windowInfo;
 
-	void _recreateWindow();
+	void _recreateWindow(entityx::EventManager & events);
+	void _closeWindow(entityx::EventManager & events);
+
+	void _pumpWindowEvents(entityx::EventManager & events);
 
 public:
 	Window(const ConstructorInfo& constructorInfo = ConstructorInfo());

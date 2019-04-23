@@ -1,20 +1,19 @@
 #include "Game.hpp"
 
+#include "component\Transform.hpp"
+#include "component\Collider.hpp"
+#include "component\Model.hpp"
+#include "component\Name.hpp"
 
-#include "Transform.hpp"
-#include "Collider.hpp"
-#include "Model.hpp"
-
-#include "Window.hpp"
-#include "Renderer.hpp"
-#include "Controller.hpp"
-#include "Physics.hpp"
-#include "Audio.hpp"
-#include "Interface.hpp"
+#include "system\Window.hpp"
+#include "system\Renderer.hpp"
+#include "system\Controller.hpp"
+#include "system\Physics.hpp"
+#include "system\Audio.hpp"
+#include "system\Interface.hpp"
 
 #include <chrono>
 #include <experimental\filesystem>
-#include <optional>
 
 using Clock = std::chrono::high_resolution_clock;
 using TimePoint = Clock::time_point;
@@ -35,7 +34,7 @@ To-do:
 
 - Dynamic collision shape scaling
 
-- Naming, find in child system, get root / hierarchy helper
+- Naming, find in child system, get root / hierarchy helper / destroying children / removing parents
 
 - Audio for physics events
 
@@ -49,8 +48,10 @@ Game::Game(int argc, char** argv){
 	// Renderer system
 	Renderer::ConstructorInfo rendererInfo;
 	rendererInfo.path = path.string();
-	rendererInfo.defaultVertexShader = "vertexShader.glsl";
-	rendererInfo.defaultFragmentShader = "fragmentShader.glsl";
+	rendererInfo.mainVertexShader = "mainVert.glsl";
+	rendererInfo.mainFragmentShader = "mainFrag.glsl";
+	rendererInfo.lineVertexShader = "lineVert.glsl";
+	rendererInfo.lineFragmentShader = "lineFrag.glsl";
 	rendererInfo.defaultTexture = "checker.png";
 
 	Window::ConstructorInfo windowInfo;
@@ -67,7 +68,6 @@ Game::Game(int argc, char** argv){
 	systems.add<Window>(windowInfo);
 	systems.add<Renderer>(rendererInfo);
 	systems.add<Interface>();
-
 	systems.add<Controller>();
 	systems.add<Physics>(physicsInfo);
 	systems.add<Audio>();
@@ -115,7 +115,7 @@ Game::Game(int argc, char** argv){
 		headCamera->zDepth = 4000000.f;
 		headCamera->offsetRotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
 
-		// Set as controlled
+		// Set as controlled (enabled on focus event)
 		systems.system<Controller>()->setControlled(_head, _body);
 		systems.system<Controller>()->setEnabled(false);
 
@@ -184,21 +184,26 @@ Game::Game(int argc, char** argv){
 	}
 
 	// Testing ball (child of head)
-	{
-		entityx::Entity ball = entities.create();
-
-		auto transform = ball.assign<Transform>();
-		transform->parent = _head;
-		transform->position = { 0.f, 1000.f, 0.f };
-		transform->scale = { 100, 100, 100 };
-
-		ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
-
-		Collider::BodyInfo bodyInfo;
-		bodyInfo.alwaysActive = true;
-
-		ball.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
-	}
+	//{
+	//	entityx::Entity ball = entities.create();
+	//
+	//	ball.assign<Name>("test");
+	//
+	//	auto transform = ball.assign<Transform>();
+	//	transform->parent = _head;
+	//	transform->position = { 0.f, 1000.f, 0.f };
+	//	transform->scale = { 100, 100, 100 };
+	//
+	//	ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+	//
+	//	Collider::BodyInfo bodyInfo;
+	//	bodyInfo.type = Collider::Solid;
+	//	bodyInfo.mass = 10;
+	//	bodyInfo.alwaysActive = true;
+	//	bodyInfo.callbacks = true;
+	//
+	//	ball.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
+	//}
 
 	// Floor
 	{
@@ -264,7 +269,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		return;
 	}
 
-	// Create a bunch of junk on mouse events (testing)
+	// Create a bunch of junk on mouse release (testing)
 	if (mousePressEvent.action != Action::Press)
 		return;
 
@@ -300,7 +305,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5f, 1.5f, 1.5f }, bodyInfo);
 		break;
 
-	case 2: // middle mouse (bouncy ball)
+	case 2: 
+		// middle mouse (bouncy ball)
 		transform->scale = { 500.f, 500.f, 500.f };
 		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
 
@@ -309,7 +315,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
 		break;
 
-	case 3: // right mouse (light pizza box)
+	case 3: 
+		// right mouse (light pizza box)
 		transform->scale = { 700.f, 700.f, 100.f };
 		model = testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "pizza.png" });
 
@@ -380,7 +387,10 @@ int Game::run(){
 		startTime(&timer);
 	
 		systems.update_all(dt);
-	
+		
+		const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
+		systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
+
 		dt = deltaTime(timer);
 	}
 	

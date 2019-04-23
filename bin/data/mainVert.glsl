@@ -16,15 +16,18 @@ out vec2 texcoord;
 //out vec3 bitangent;
 
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+//uniform mat4 view;
+//uniform mat4 projection;
 
-uniform mat4 modelView;
+uniform GlobalMatrices {
+	mat4 view;
+	mat4 projection;
+};
 
 //uniform mat4 bones[256];
 
 void main(){
-	gl_Position = projection * modelView * vec4(inVertex, 1);
+	gl_Position = projection * view * model * vec4(inVertex, 1);
 
 	normal = inNormal;
 	texcoord = inTexcoord;

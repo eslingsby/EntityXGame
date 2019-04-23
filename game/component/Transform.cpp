@@ -1,4 +1,4 @@
-#include "Transform.hpp"
+#include "component\Transform.hpp"
 
 #include <glm\gtc\matrix_transform.hpp>
 #include <glm\gtx\matrix_decompose.hpp>
@@ -52,7 +52,7 @@ void Transform::globalDecomposed(glm::vec3* position, glm::quat* rotation, glm::
 	
 	glm::decompose(globalMatrix(), *scale, *rotation, *position, glm::vec3(), glm::vec4());
 
-	*rotation = glm::inverse(*rotation); // not sure why, goes crazy without
+	*rotation = glm::inverse(*rotation); // not sure why, goes crazy without???
 }
 
 void Transform::localRotate(const glm::quat& rotate) {

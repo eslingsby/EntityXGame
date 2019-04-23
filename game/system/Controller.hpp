@@ -2,8 +2,8 @@
 
 #include <entityx\System.h>
 
-#include "WindowEvents.hpp"
-#include "PhysicsEvents.hpp"
+#include "system\WindowEvents.hpp"
+#include "system\PhysicsEvents.hpp"
 
 class Controller : public entityx::System<Controller>, public entityx::Receiver<Controller> {
 	//entityx::Entity _controlled;

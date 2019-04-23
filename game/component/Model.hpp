@@ -1,8 +1,10 @@
 #pragma once
 
-#include "GlLoader.hpp"
+#include "object\GlLoader.hpp"
+
 #include <string>
 #include <cstdint>
+
 #include <entityx\Entity.h>
 
 struct Model{

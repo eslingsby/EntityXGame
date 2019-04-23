@@ -1,17 +1,21 @@
 #pragma once
 
-#include <entityx\System.h>
+#include "component\Collider.hpp"
 
-#include "Collider.hpp"
+#include "object\BulletDebug.hpp"
+
+#include <entityx\System.h>
 
 #include <btBulletDynamicsCommon.h>
 
 class Physics : public entityx::System<Physics>, public entityx::Receiver<Physics> {
-	btDefaultCollisionConfiguration* _collisionConfiguration = nullptr;
-	btCollisionDispatcher* _dispatcher = nullptr;
-	btBroadphaseInterface* _overlappingPairCache = nullptr;
-	btSequentialImpulseConstraintSolver* _solver = nullptr;
-	btDiscreteDynamicsWorld* _dynamicsWorld = nullptr;
+	btDefaultCollisionConfiguration _collisionConfiguration;
+	btCollisionDispatcher _dispatcher;
+	btDbvtBroadphase _overlappingPairCache;
+	btSequentialImpulseConstraintSolver _solver;
+	btDiscreteDynamicsWorld _dynamicsWorld;
+
+	BulletDebug _debugger;
 
 public:
 	struct ConstructorInfo {
@@ -25,15 +29,16 @@ private:
 
 public:
 	Physics(const ConstructorInfo& constructorInfo = ConstructorInfo());
-	~Physics();
 
 	void configure(entityx::EventManager &events) final;
 	void update(entityx::EntityManager &entities, entityx::EventManager &events, double dt) final;
 
-	void setGravity(const glm::vec3& gravity);
-
 	void receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent);
 	void receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent);
 
+	void setGravity(const glm::vec3& gravity);
+
 	void rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<entityx::Entity>& hits);
+
+	const BulletDebug& bulletDebug() const;
 };

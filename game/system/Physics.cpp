@@ -1,46 +1,46 @@
-#include "Physics.hpp"
-
 #include <btBulletCollisionCommon.h>
 #include <BulletCollision\NarrowPhaseCollision\btRaycastCallback.h>
 
-#include "Transform.hpp"
-#include "PhysicsEvents.hpp"
+#include "component\Transform.hpp"
 
-std::vector<CollidingEvent> collidingEvents;
-std::vector<ContactEvent> contactEvents;
+#include "system\Physics.hpp"
+#include "system\PhysicsEvents.hpp"
+
+entityx::EventManager* eventsPtr;
 
 void contactStartedCallback(btPersistentManifold* const& manifold) {
 	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
 	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	if (firstCollider->bodyInfo.callbacks)
-		collidingEvents.push_back(CollidingEvent{ true, ContactEvent{ firstCollider->self, secondCollider->self } });
+	//std::cout << "Contact started with " << firstCollider->self.id() << ", " << secondCollider->self.id() << '\n';
+
+	eventsPtr->emit<CollidingEvent>(CollidingEvent{ true, ContactEvent{ firstCollider->self, secondCollider->self } });
 }
 
 void contactEndedCallback(btPersistentManifold* const& manifold) {
 	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
 	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	if (firstCollider->bodyInfo.callbacks)
-		collidingEvents.push_back(CollidingEvent{ false, ContactEvent{ firstCollider->self, secondCollider->self} });
+	//std::cout << "Contact ended with " << firstCollider->self.id() << ", " << secondCollider->self.id() << '\n';
+
+	eventsPtr->emit<CollidingEvent>(CollidingEvent{ false, ContactEvent{ firstCollider->self, secondCollider->self } });
 }
 
 bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
 	Collider* firstCollider = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
 	Collider* secondCollider = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
 
-	if (firstCollider->bodyInfo.callbacks)
-		contactEvents.push_back(ContactEvent{ firstCollider->self, secondCollider->self });
+	eventsPtr->emit<ContactEvent>(ContactEvent{ firstCollider->self, secondCollider->self });
 
 	return false;
 }
 
-Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(constructorInfo) {
-	_collisionConfiguration = new btDefaultCollisionConfiguration();
-	_dispatcher = new btCollisionDispatcher(_collisionConfiguration);
-	_overlappingPairCache = new btDbvtBroadphase();
-	_solver = new btSequentialImpulseConstraintSolver;
-	_dynamicsWorld = new btDiscreteDynamicsWorld(_dispatcher, _overlappingPairCache, _solver, _collisionConfiguration);
+Physics::Physics(const ConstructorInfo& constructorInfo) :
+		_constructorInfo(constructorInfo), 
+		_dispatcher(&_collisionConfiguration), 
+		_dynamicsWorld(&_dispatcher, &_overlappingPairCache, &_solver, &_collisionConfiguration) {
+
+	_dynamicsWorld.setDebugDrawer(&_debugger);
 
 	setGravity(_constructorInfo.defaultGravity);
 
@@ -49,22 +49,11 @@ Physics::Physics(const ConstructorInfo& constructorInfo) : _constructorInfo(cons
 	gContactEndedCallback = contactEndedCallback;
 }
 
-Physics::~Physics(){
-	if (_dynamicsWorld)
-		delete _dynamicsWorld;
-	if (_solver)
-		delete _solver;
-	if (_overlappingPairCache)
-		delete _overlappingPairCache;
-	if (_dispatcher)
-		delete _dispatcher;
-	if (_collisionConfiguration)
-		delete _collisionConfiguration;
-}
-
 void Physics::configure(entityx::EventManager & events){
 	events.subscribe<entityx::ComponentAddedEvent<Collider>>(*this);
 	events.subscribe<entityx::ComponentRemovedEvent<Collider>>(*this);
+
+	eventsPtr = &events;
 }
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
@@ -73,10 +62,12 @@ void Physics::update(entityx::EntityManager & entities, entityx::EventManager & 
 		auto transform = entity.component<Transform>();
 		auto collider = entity.component<Collider>();
 		
+		// If position / rotation changed
 		glm::vec3 globalPosition;
 		glm::quat globalRotation;
+		glm::vec3 globalScale;
 
-		transform->globalDecomposed(&globalPosition, &globalRotation);
+		transform->globalDecomposed(&globalPosition, &globalRotation, &globalScale);
 		
 		btTransform newTransform;
 
@@ -84,28 +75,38 @@ void Physics::update(entityx::EntityManager & entities, entityx::EventManager & 
 		newTransform.setRotation(toBt(globalRotation));
 
 		collider->rigidBody.setWorldTransform(newTransform);
+
+		// If scale, mass, or center of mass changed
+		btCollisionShape* collisionShape;
+
+		std::visit([&](btCollisionShape& shape) {
+			collisionShape = &shape;
+		}, collider->shapeVariant);
+
+		if (fromBt(collisionShape->getLocalScaling()) != globalScale) {
+			_dynamicsWorld.removeRigidBody(&collider->rigidBody);
+
+			collisionShape->setLocalScaling(toBt(globalScale));
+
+			btVector3 inertia;
+			collisionShape->calculateLocalInertia(collider->bodyInfo.mass, inertia);
+
+			collider->rigidBody.setMassProps(collider->bodyInfo.mass, inertia);
+
+			_dynamicsWorld.addRigidBody(&collider->rigidBody);
+		}
 	}
 
-	// Step the simulation, emitting events each step
+	// Step the simulation, pumping collision events each step
 	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++) {
-		_dynamicsWorld->stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
-
-		for (const CollidingEvent& collidingEvent : collidingEvents)
-			events.emit<CollidingEvent>(collidingEvent);
-
-		collidingEvents.clear();
-
-		for (const ContactEvent& contactEvent : contactEvents)
-			events.emit<ContactEvent>(contactEvent);
-
-		contactEvents.clear();
+		_dynamicsWorld.stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
 
 		events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
 	}
-}
 
-void Physics::setGravity(const glm::vec3 & gravity){
-	_dynamicsWorld->setGravity(toBt(gravity));
+	// Draw bullet world
+	_debugger.clearLines();
+	_dynamicsWorld.debugDrawWorld();
 }
 
 void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent) {
@@ -179,13 +180,21 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 	if (collider->bodyInfo.callbacks)
 		collider->rigidBody.setCollisionFlags(collider->rigidBody.getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK);
 
-	_dynamicsWorld->addRigidBody(&collider->rigidBody);
+	_dynamicsWorld.addRigidBody(&collider->rigidBody);
+
+	//std::cout << "Collider added " << colliderAddedEvent.entity.id() << '\n';
 }
 
 void Physics::receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent){
 	auto collider = colliderRemovedEvent.component;
 
-	_dynamicsWorld->removeRigidBody(&collider->rigidBody);
+	_dynamicsWorld.removeRigidBody(&collider->rigidBody);
+
+	//std::cout << "Collider removed " << colliderRemovedEvent.entity.id() << '\n';
+}
+
+void Physics::setGravity(const glm::vec3 & gravity) {
+	_dynamicsWorld.setGravity(toBt(gravity));
 }
 
 void Physics::rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<entityx::Entity>& hits){
@@ -197,7 +206,7 @@ void Physics::rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<en
 	results.m_flags |= btTriangleRaycastCallback::kF_KeepUnflippedNormal;
 	results.m_flags |= btTriangleRaycastCallback::kF_UseSubSimplexConvexCastRaytest;
 
-	_dynamicsWorld->rayTest(bFrom, bTo, results);
+	_dynamicsWorld.rayTest(bFrom, bTo, results);
 
 	hits.reserve(results.m_collisionObjects.size());
 
@@ -205,4 +214,8 @@ void Physics::rayTest(const glm::vec3& from, const glm::vec3& to, std::vector<en
 		Collider* collider = (Collider*)results.m_collisionObjects[i]->getUserPointer();
 		hits.push_back(collider->self);
 	}
+}
+
+const BulletDebug & Physics::bulletDebug() const{
+	return _debugger;
 }

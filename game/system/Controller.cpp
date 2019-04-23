@@ -1,7 +1,7 @@
-#include "Controller.hpp"
+#include "system\Controller.hpp"
 
-#include "Transform.hpp"
-#include "Collider.hpp"
+#include "component\Transform.hpp"
+#include "component\Collider.hpp"
 
 void Controller::configure(entityx::EventManager &events){
 	events.subscribe<CursorEnterEvent>(*this);

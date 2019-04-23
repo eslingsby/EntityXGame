@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include <glm\vec2.hpp>
 
 enum Modifier : uint8_t {

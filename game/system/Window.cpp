@@ -1,6 +1,5 @@
-#include "Window.hpp"
-
-#include "WindowEvents.hpp"
+#include "system\Window.hpp"
+#include "system\WindowEvents.hpp"
 
 const std::unordered_map<uint32_t, uint32_t> sdlKeymap{
 	{ SDLK_UNKNOWN, Key_Unknown },
@@ -132,11 +131,10 @@ void fromSdl(const uint16_t& from, uint8_t* to) {
 		*to |= Mod_Caps;
 }
 
-void Window::_recreateWindow(){
-	if (_window)
-		SDL_DestroyWindow(_window);
+void Window::_recreateWindow(entityx::EventManager & events){
 
-	uint32_t flags = SDL_WINDOW_OPENGL;
+	if (_window)
+		_closeWindow(events);
 
 	_window = SDL_CreateWindow(
 		_windowInfo.title, 
@@ -147,61 +145,35 @@ void Window::_recreateWindow(){
 		_windowInfo.flags
 	);
 
-	if (!_context) {
-		_context = SDL_GL_CreateContext(_window);
-		gladLoadGLLoader(SDL_GL_GetProcAddress);
-	}
-
+	//if (!_context) {
+	//	_context = SDL_GL_CreateContext(_window);
+	//	gladLoadGLLoader(SDL_GL_GetProcAddress);
+	//}
+	
+	assert(_context); // Context already created once in ctor
 	SDL_GL_MakeCurrent(_window, _context);
 
 	SDL_SetRelativeMouseMode((SDL_bool)_windowInfo.lockedCursor);
+
+	// Emit open events
+	events.emit<WindowSizeEvent>(WindowSizeEvent{ _windowInfo.size });
+	events.emit<FramebufferSizeEvent>(FramebufferSizeEvent{ _windowInfo.size });
+	events.emit<WindowOpenEvent>(WindowOpenEvent{ true });
 }
 
-Window::Window(const ConstructorInfo& constructorInfo) : _constructorInfo(constructorInfo){
-	SDL_Init(SDL_INIT_VIDEO);
+void Window::_closeWindow(entityx::EventManager & events){
+	if (!_window)
+		return;
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, _constructorInfo.contextVersionMajor);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, _constructorInfo.contextVersionMinor);
+	SDL_DestroyWindow(_window);
+	_window = nullptr;
 
-	if (_constructorInfo.coreContex)
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-
-	if (_constructorInfo.debugContext)
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-
-	_windowInfo = _constructorInfo.defaultWindow;
-
-	_recreateWindow();
+	// Emit close event
+	events.emit<WindowOpenEvent>(WindowOpenEvent{ false });
 }
 
-Window::~Window(){
-	if (_context)
-		SDL_GL_DeleteContext(_context);
-
-	if (_window)
-		SDL_DestroyWindow(_window);
-
-	SDL_Quit();
-}
-
-void Window::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt){
-	// trip once when _window gets created or destroyed
-	if ((_window != nullptr) != _wasOpen) {
-		if (!_wasOpen) {
-			events.emit<WindowSizeEvent>(WindowSizeEvent{ _windowInfo.size });
-			events.emit<FramebufferSizeEvent>(FramebufferSizeEvent{ _windowInfo.size });
-			events.emit<WindowOpenEvent>(WindowOpenEvent{ true });
-		}
-		else {
-			events.emit<WindowOpenEvent>(WindowOpenEvent{ false });
-		}
-
-		_wasOpen = _window != nullptr;
-	}
-
-	if (_window)
-		SDL_GL_SwapWindow(_window);
-
+void Window::_pumpWindowEvents(entityx::EventManager & events){
+	// Pump SDL events
 	SDL_Event e;
 	decltype(sdlKeymap)::const_iterator i;
 	uint8_t mod;
@@ -282,22 +254,74 @@ void Window::update(entityx::EntityManager& entities, entityx::EventManager& eve
 	}
 }
 
+Window::Window(const ConstructorInfo& constructorInfo) :
+		_constructorInfo(constructorInfo), 
+		_windowInfo(_constructorInfo.defaultWindow) {
+
+	SDL_Init(SDL_INIT_VIDEO);
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, _constructorInfo.contextVersionMajor);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, _constructorInfo.contextVersionMinor);
+
+	if (_constructorInfo.coreContex)
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
+	if (_constructorInfo.debugContext)
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+
+	// Create temporary window to hold OpenGL context (gets destroyed and replaced on first update)
+	_window = SDL_CreateWindow("", 0, 0, 0, 0, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+
+	_context = SDL_GL_CreateContext(_window);
+	gladLoadGLLoader(SDL_GL_GetProcAddress);
+
+	SDL_GL_MakeCurrent(_window, _context);
+}
+
+Window::~Window(){
+	if (_context)
+		SDL_GL_DeleteContext(_context);
+
+	if (_window)
+		SDL_DestroyWindow(_window);
+
+	SDL_Quit();
+}
+
+void Window::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt){
+	// Check if window needs to be recreated or closed
+	if (_open && !_window)
+		_recreateWindow(events);
+	else if (!_open && _window)
+		_closeWindow(events);
+
+	if (_window)
+		SDL_GL_SwapWindow(_window);
+
+	// Pump events
+	_pumpWindowEvents(events);
+
+	// Destroy initial context window (after events)
+	if (_contextWindow) {
+		SDL_DestroyWindow(_window);
+		_window = nullptr;
+
+		_recreateWindow(events);
+		_contextWindow = false;
+	}
+}
+
 void Window::openWindow(const WindowInfo& windowInfo){
 	_windowInfo = windowInfo;
-
-	openWindow();
+	_open = true;
 }
 
 void Window::openWindow(){
-	_recreateWindow();
+	_open = true;
 }
 
 void Window::closeWindow(){
-	if (!_window)
-		return;
-
-	SDL_DestroyWindow(_window);
-	_window = nullptr;
+	_open = false;
 }
 
 void Window::lockCursor(bool lock){
@@ -308,7 +332,7 @@ void Window::lockCursor(bool lock){
 }
 
 bool Window::isOpen() const{
-	return _window != nullptr;
+	return _open;
 }
 
 Window::WindowInfo Window::windowInfo() const{

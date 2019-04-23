@@ -1,8 +1,8 @@
-file(GLOB src "*.hpp" "*.cpp" "*.h")
+file(GLOB_RECURSE src "*.hpp" "*.cpp")
 
 add_executable("Game" "${src}")
 
-#target_link_libraries("Game" "Framework")
+target_include_directories("Game" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries("Game" "SDL2main")
 target_link_libraries("Game" "SDL2-static")
@@ -17,8 +17,6 @@ target_link_libraries("Game" "BulletCollision")
 target_link_libraries("Game" "BulletDynamics")
 target_link_libraries("Game" "imgui")
 #target_link_libraries("Game" "RapidJSON")
-
-#target_link_libraries("Game" winmm.lib)
 
 if(MSVC)
 	set_target_properties("Game" PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS /entry:mainCRTStartup")
