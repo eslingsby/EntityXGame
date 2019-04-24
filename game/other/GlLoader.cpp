@@ -1,4 +1,4 @@
-#include "object\GlLoader.hpp"
+#include "other\GlLoader.hpp"
 
 #include <glm\gtx\matrix_decompose.hpp>
 

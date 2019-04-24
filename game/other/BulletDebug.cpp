@@ -1,4 +1,4 @@
-#include "object\BulletDebug.hpp"
+#include "other\BulletDebug.hpp"
 
 void BulletDebug::drawLine(const btVector3 & from, const btVector3 & to, const btVector3 & color) {
 	Line line;

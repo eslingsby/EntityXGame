@@ -2,7 +2,7 @@
 
 #include "component\Collider.hpp"
 
-#include "object\BulletDebug.hpp"
+#include "other\BulletDebug.hpp"
 
 #include <entityx\System.h>
 

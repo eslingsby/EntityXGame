@@ -76,10 +76,10 @@ void Renderer::rebufferLines(uint32_t count, const Line * lines){
 	glBufferData(GL_ARRAY_BUFFER, count * sizeof(Line), lines, GL_DYNAMIC_DRAW);
 
 	glEnableVertexAttribArray(0); // position
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)(0));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3) * 2, (void*)(0));
 
 	glEnableVertexAttribArray(1); // colour
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)(sizeof(glm::vec3)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3) * 2, (void*)(sizeof(glm::vec3)));
 
 	_lineCount = count;
 }
@@ -104,10 +104,10 @@ void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& e
 		glUseProgram(_lineProgram.program);
 		glUniformBlockBinding(_lineProgram.program, glGetUniformBlockIndex(_lineProgram.program, _uniformNames.globalMatricesStruct.c_str()), 0);
 
-		glPointSize(10);
+		//glPointSize(10);
 
 		glBindVertexArray(_lineBufferObject);
-		glDrawArrays(GL_POINTS, 0, _lineCount * 4);
+		glDrawArrays(GL_LINES, 0, _lineCount * 4);
 	}
 
 	// draw meshes
@@ -125,10 +125,10 @@ void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& e
 
 	for (auto entity : entities.entities_with_components<Transform, Model>()) {
 		const Transform& transform = *entity.component<Transform>().get();
-		Model& model = *entity.component<Model>().get();
+		const Model& model = *entity.component<Model>().get();
 	
 		if (!model.meshContext.indexCount || !model.textureContext.textureBuffer)
-			return;
+			continue;
 	
 		// bind model matrix
 		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, &transform.globalMatrix()[0][0]);

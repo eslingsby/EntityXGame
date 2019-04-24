@@ -3,8 +3,8 @@
 #include <entityx\System.h>
 #include <SDL_events.h>
 
-#include "object\GlLoader.hpp"
-#include "object\Line.hpp"
+#include "other\GlLoader.hpp"
+#include "other\Line.hpp"
 
 #include "component\Transform.hpp"
 #include "component\Model.hpp"

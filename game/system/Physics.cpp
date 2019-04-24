@@ -12,7 +12,8 @@ void contactStartedCallback(btPersistentManifold* const& manifold) {
 	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
 	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	//std::cout << "Contact started with " << firstCollider->self.id() << ", " << secondCollider->self.id() << '\n';
+	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
+		return;
 
 	eventsPtr->emit<CollidingEvent>(CollidingEvent{ true, ContactEvent{ firstCollider->self, secondCollider->self } });
 }
@@ -21,7 +22,8 @@ void contactEndedCallback(btPersistentManifold* const& manifold) {
 	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
 	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 
-	//std::cout << "Contact ended with " << firstCollider->self.id() << ", " << secondCollider->self.id() << '\n';
+	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
+		return;
 
 	eventsPtr->emit<CollidingEvent>(CollidingEvent{ false, ContactEvent{ firstCollider->self, secondCollider->self } });
 }
@@ -29,6 +31,9 @@ void contactEndedCallback(btPersistentManifold* const& manifold) {
 bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
 	Collider* firstCollider = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
 	Collider* secondCollider = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
+
+	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
+		return false;
 
 	eventsPtr->emit<ContactEvent>(ContactEvent{ firstCollider->self, secondCollider->self });
 
@@ -181,16 +186,12 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 		collider->rigidBody.setCollisionFlags(collider->rigidBody.getCollisionFlags() | btCollisionObject::CollisionFlags::CF_CUSTOM_MATERIAL_CALLBACK);
 
 	_dynamicsWorld.addRigidBody(&collider->rigidBody);
-
-	//std::cout << "Collider added " << colliderAddedEvent.entity.id() << '\n';
 }
 
 void Physics::receive(const entityx::ComponentRemovedEvent<Collider>& colliderRemovedEvent){
 	auto collider = colliderRemovedEvent.component;
 
 	_dynamicsWorld.removeRigidBody(&collider->rigidBody);
-
-	//std::cout << "Collider removed " << colliderRemovedEvent.entity.id() << '\n';
 }
 
 void Physics::setGravity(const glm::vec3 & gravity) {

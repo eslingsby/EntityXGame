@@ -1,6 +1,6 @@
 #pragma once
 
-#include "object\GlLoader.hpp"
+#include "other\GlLoader.hpp"
 
 #include <string>
 #include <cstdint>

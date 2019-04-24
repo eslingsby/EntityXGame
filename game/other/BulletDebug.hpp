@@ -6,7 +6,7 @@
 
 #include <glm\vec3.hpp>
 
-#include "object\Line.hpp"
+#include "other\Line.hpp"
 
 class BulletDebug : public btIDebugDraw {
 	std::vector<Line> _lineBuffer;
