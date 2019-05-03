@@ -4,6 +4,7 @@
 #include "component\Collider.hpp"
 #include "component\Model.hpp"
 #include "component\Name.hpp"
+#include "component\Listener.hpp"
 
 #include "system\Window.hpp"
 #include "system\Renderer.hpp"
@@ -12,20 +13,10 @@
 #include "system\Audio.hpp"
 #include "system\Interface.hpp"
 
+#include "other\Time.hpp"
+
 #include <chrono>
 #include <experimental\filesystem>
-
-using Clock = std::chrono::high_resolution_clock;
-using TimePoint = Clock::time_point;
-
-inline void startTime(TimePoint* point) {
-	*point = Clock::now();
-}
-
-template <typename T = double>
-inline T deltaTime(const TimePoint& point) {
-	return std::chrono::duration_cast<std::chrono::duration<T>>(Clock::now() - point).count();
-}
 
 /*
 To-do:
@@ -115,12 +106,27 @@ Game::Game(int argc, char** argv){
 		headCamera->zDepth = 4000000.f;
 		headCamera->offsetRotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
 
+		_head.assign<Listener>();
+
 		// Set as controlled (enabled on focus event)
 		systems.system<Controller>()->setControlled(_head, _body);
 		systems.system<Controller>()->setEnabled(false);
 
 		// Set as focused UI entity
 		systems.system<Interface>()->setFocusedEntity(_body);
+	}
+
+	// Testing sound
+	{
+		entityx::Entity sound = entities.create();
+		
+		auto transform = sound.assign<Transform>();
+		transform->position = { 0, -5000, 1000 };
+		transform->scale = { 100, 100, 100 };
+
+		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+
+		sound.assign<Sound>();
 	}
 
 	// Axis (with collider for each axis)
@@ -197,8 +203,8 @@ Game::Game(int argc, char** argv){
 	//	ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
 	//
 	//	Collider::BodyInfo bodyInfo;
-	//	bodyInfo.type = Collider::Solid;
-	//	bodyInfo.mass = 10;
+	//	bodyInfo.type = Collider::Trigger;
+	//	//bodyInfo.mass = 10;
 	//	bodyInfo.alwaysActive = true;
 	//	bodyInfo.callbacks = true;
 	//
@@ -295,7 +301,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 	switch (mousePressEvent.button) {
 	case 1: 
-		// left mouse (heavy anvil)
+		// left mouse (heavy weight)
 		transform->scale = { 1000.f, 1000.f, 1000.f };
 		model = testent.assign<Model>(Model::FilePaths{ "anvil.obj", 0, "anvil.png" });
 
@@ -303,7 +309,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		bodyInfo.defaultFriction = 1;
 		bodyInfo.defaultRestitution = 0;
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5f, 1.5f, 1.5f }, bodyInfo);
-		break;
+
+		return;
 
 	case 2: 
 		// middle mouse (bouncy ball)
@@ -313,7 +320,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		bodyInfo.mass = 5;
 		bodyInfo.defaultRestitution = 1.f;
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
-		break;
+
+		return;
 
 	case 3: 
 		// right mouse (light pizza box)
@@ -322,7 +330,8 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 		bodyInfo.mass = 1;
 		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box }, bodyInfo);
-		break;
+
+		return;
 	}
 }
 
@@ -351,31 +360,48 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 
 	case Key_R: 
 		// clean-up
-		if (keyInputEvent.action != Action::Release)
-			return;
+		if (keyInputEvent.action == Action::Press && !_rDown) {
+		
+			if (keyInputEvent.action != Action::Press)
+				return;
 
-		for (entityx::Entity& entity : _sandbox)
-			entity.destroy();
+			for (entityx::Entity& entity : _sandbox)
+				entity.destroy();
 
-		_sandbox.clear();
+			_sandbox.clear();
+
+			_rDown = true;
+		}
+		else if (keyInputEvent.action == Action::Release && _rDown) {
+			_rDown = false;
+		}
 
 		return;
 
 	case Key_T:
 		// respawn
-		if (keyInputEvent.action != Action::Release)
-			return;
+		if (keyInputEvent.action == Action::Press && !_rDown) {
+			if (keyInputEvent.action != Action::Press)
+				return;
 
-		if (!_body.valid() || !_body.has_component<Transform>())
-			return;
+			if (!_body.valid() || !_body.has_component<Transform>())
+				return;
 
-		_body.component<Transform>()->position = _spawnLocation;
+			_body.component<Transform>()->position = _spawnLocation;
 
-		if (!_body.has_component<Collider>())
-			return;
+			if (!_body.has_component<Collider>())
+				return;
 
-		_body.component<Collider>()->setAngularVelocity({ 0, 0, 0 });
-		_body.component<Collider>()->setLinearVelocity({ 0, 0, 0 });
+			_body.component<Collider>()->setAngularVelocity({ 0, 0, 0 });
+			_body.component<Collider>()->setLinearVelocity({ 0, 0, 0 });
+
+			_tDown = true;
+		}
+		else if (keyInputEvent.action == Action::Release && _rDown) {
+			_tDown = false;
+		}
+
+		return;
 	}
 }
 

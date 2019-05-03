@@ -2,9 +2,12 @@
 
 #include "glm\vec3.hpp"
 
+struct Point {
+	glm::vec3 position;
+	glm::vec3 colour;
+};
+
 struct Line {
-	glm::vec3 fromPosition;
-	glm::vec3 fromColour;
-	glm::vec3 toPosition;
-	glm::vec3 toColour;
+	Point from;
+	Point to;
 };

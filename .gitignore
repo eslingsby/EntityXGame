@@ -15,3 +15,11 @@ thirdparty/stb/*
 !thirdparty/imgui-1.69
 thirdparty/imgui-1.69/*
 !thirdparty/imgui-1.69/CMakeLists.txt
+
+!thirdparty/libaudiodecoder-master
+thirdparty/libaudiodecoder-master/*
+!thirdparty/libaudiodecoder-master/CMakeLists.txt
+
+!thirdparty/steamaudio_api
+thirdparty/steamaudio_api/*
+!thirdparty/steamaudio_api/CMakeLists.txt

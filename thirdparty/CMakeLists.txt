@@ -1,5 +1,5 @@
 add_custom_target("uninstall")
-set_target_properties("uninstall" PROPERTIES FOLDER "CMake")
+set_target_properties("uninstall" PROPERTIES FOLDER "CMakePredefinedTargets")
 
 option(BUILD_SHARED_LIBS "" OFF)
 
@@ -68,27 +68,6 @@ target_include_directories("entityx" PUBLIC
 
 set_target_properties("entityx" PROPERTIES FOLDER "Thirdparty")
 
-############# SFML #############
-option(SFML_BUILD_GRAPHICS "" OFF)
-option(SFML_BUILD_NETWORK "" OFF)
-option(SFML_BUILD_WINDOW "" OFF)
-
-add_external_tar("SFML-2.5.1" "https://github.com/SFML/SFML/archive/2.5.1.tar.gz" "")
-
-target_compile_definitions("sfml-audio" PUBLIC _HAS_AUTO_PTR_ETC)
-
-if (MSVC)
-	if("${CMAKE_GENERATOR}" MATCHES "(Win64|IA64)")
-		configure_file("SFML-2.5.1/extlibs/bin/x64/openal32.dll" "${PROJECT_SOURCE_DIR}/bin" COPYONLY)
-	else()
-		configure_file("SFML-2.5.1/extlibs/bin/x86/openal32.dll" "${PROJECT_SOURCE_DIR}/bin" COPYONLY)
-	endif()
-endif()
-
-set_target_properties("sfml-audio" PROPERTIES FOLDER "Thirdparty")
-set_target_properties("sfml-main" PROPERTIES FOLDER "Thirdparty")
-set_target_properties("sfml-system" PROPERTIES FOLDER "Thirdparty")
-
 ############# Bullet3 #############
 option(BUILD_BULLET2_DEMOS "" OFF)
 option(BUILD_CLSOCKET "" OFF)
@@ -137,6 +116,48 @@ endif()
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/imgui-1.69/")
 
 set_target_properties("imgui" PROPERTIES FOLDER "Thirdparty")
+
+############# libsoundio #############
+option(BUILD_DYNAMIC_LIBS "" OFF)
+option(BUILD_STATIC_LIBS "" ON)
+
+option(BUILD_EXAMPLE_PROGRAMS "" OFF)
+option(BUILD_TESTS "" OFF)
+
+add_external_tar("libsoundio-2.0.0" "https://github.com/andrewrk/libsoundio/archive/2.0.0.tar.gz" "")
+
+target_include_directories("libsoundio_static" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libsoundio-2.0.0")
+
+target_compile_definitions("libsoundio_static" PUBLIC "SOUNDIO_STATIC_LIBRARY")
+
+set_target_properties("libsoundio_static" PROPERTIES FOLDER "Thirdparty")
+set_target_properties("doc" PROPERTIES FOLDER "Thirdparty")
+
+############# Steam audio #############
+
+
+if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/steamaudio_api/include/phonon.h")
+	download_extract_tar("steamaudio_api" "https://github.com/ValveSoftware/steam-audio/releases/download/v2.0-beta.17/steamaudio_api_2.0-beta.17.zip")
+endif()
+
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/steamaudio_api/")
+
+if (MSVC)
+	if("${CMAKE_GENERATOR}" MATCHES "(Win64|IA64)")
+		configure_file("steamaudio_api/bin/Windows/x64/phonon.dll" "${PROJECT_SOURCE_DIR}/bin" COPYONLY)
+	else()
+		configure_file("steamaudio_api/bin/Windows/x86/phonon.dll" "${PROJECT_SOURCE_DIR}/bin" COPYONLY)
+	endif()
+endif()
+
+############# libaudiodecoder #############
+if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libaudiodecoder-master/include/audiodecoder.h")
+	download_extract_zip("libaudiodecoder-master" "https://github.com/asantoni/libaudiodecoder/archive/master.zip")
+endif()
+
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libaudiodecoder-master/")
+
+set_target_properties("libaudiodecoder" PROPERTIES FOLDER "Thirdparty")
 
 ############# RapidJson #############
 #option(RAPIDJSON_BUILD_DOC "" OFF)

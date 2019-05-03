@@ -9,6 +9,7 @@
 #include "other\Line.hpp"
 
 class BulletDebug : public btIDebugDraw {
+	std::vector<Point> _pointBuffer;
 	std::vector<Line> _lineBuffer;
 
 	void drawLine(const btVector3 &from, const btVector3 &to, const btVector3 &color) final;

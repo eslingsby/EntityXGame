@@ -17,6 +17,9 @@ class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 
 	bool _wasHovering = false;
 
+	bool _rDown = false;
+	bool _tDown = false;
+
 	std::vector<entityx::Entity> _sandbox;
 public:
 	Game(int argc, char** argv);

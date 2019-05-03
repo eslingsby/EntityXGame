@@ -7,7 +7,7 @@
 
 void errorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
 	std::string errorMessage(message, message + length);
-	std::cerr << source << ',' << type << ',' << id << ',' << severity << std::endl << errorMessage << std::endl << std::endl;
+	std::cerr << "opengl callback: " << source << ',' << type << ',' << id << ',' << severity << std::endl << errorMessage << std::endl << std::endl;
 }
 
 std::string Renderer::_fullPath(const std::string & relativePath) const {
