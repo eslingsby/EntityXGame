@@ -1,6 +1,9 @@
+<img src="/bin/banner.png" alt="preview" width="100%"/>
+
 ## EntityX Game
-Work in progress 3D game in EntityX. A lot of systems and components are copied over from [SimpleEngine](https://github.com/ElliottSlingsby/SimpleEngine).
-Currently only working with CMake Visual Studio 15 2017 generator on Windows.
+WIP game in EntityX. A lot of systems and components are copied over from [SimpleEngine](https://github.com/ElliottSlingsby/SimpleEngine).
+
+Currently only working with CMake Visual Studio 15 2017 generator on Windows. Thirdparty libraries are downloaded by CMake on generation.
 
 ### Libraries
 - EntityX, Entity framework, [github.com/alecthomas/entityx](http://github.com/alecthomas/entityx)
