@@ -1,4 +1,4 @@
-<img src="/bin/banner.png" alt="preview" width="100%"/>
+<img src="/bin/data/banner.png" alt="preview" width="100%"/>
 
 ## EntityX Game
 WIP game in EntityX. A lot of systems and components are copied over from [SimpleEngine](https://github.com/ElliottSlingsby/SimpleEngine).
