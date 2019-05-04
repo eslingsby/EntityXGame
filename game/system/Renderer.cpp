@@ -2,20 +2,14 @@
 
 #include "component\Transform.hpp"
 
+#include "other\Path.hpp"
+
 #include <experimental\filesystem>
 #include <glm\gtc\matrix_transform.hpp>
 
 void errorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
 	std::string errorMessage(message, message + length);
 	std::cerr << "Renderer opengl: " << source << ',' << type << ',' << id << ',' << severity << std::endl << errorMessage << std::endl << std::endl;
-}
-
-std::string Renderer::_fullPath(const std::string & relativePath) const {
-	std::experimental::filesystem::path path = _path;
-
-	path.replace_filename(relativePath);
-
-	return path.string();
 }
 
 Renderer::Renderer(const ConstructorInfo& constructorInfo) : 
@@ -36,14 +30,14 @@ Renderer::Renderer(const ConstructorInfo& constructorInfo) :
 	glEnable(GL_DITHER);
 
 	// load default texture
-	auto defaultTexture = _glLoader.loadTexture(_fullPath(constructorInfo.defaultTexture));
+	auto defaultTexture = _glLoader.loadTexture(formatPath(_path, constructorInfo.defaultTexture));
 
 	if (defaultTexture)
 		_defaultTexture = *defaultTexture;
 
 	// load shader programs
-	auto mainProgram = _glLoader.loadProgram(_fullPath(constructorInfo.mainVertexShader), _fullPath(constructorInfo.mainFragmentShader));
-	auto lineProgram = _glLoader.loadProgram(_fullPath(constructorInfo.lineVertexShader), _fullPath(constructorInfo.lineFragmentShader));
+	auto mainProgram = _glLoader.loadProgram(formatPath(_path, constructorInfo.mainVertexShader), formatPath(_path, constructorInfo.mainFragmentShader));
+	auto lineProgram = _glLoader.loadProgram(formatPath(_path, constructorInfo.lineVertexShader), formatPath(_path, constructorInfo.lineFragmentShader));
 
 	if (mainProgram)
 		_mainProgram = *mainProgram;
@@ -148,7 +142,7 @@ void Renderer::receive(const entityx::ComponentAddedEvent<Model>& modelAddedEven
 	if (model->filePaths.meshFile == "")
 		return;
 
-	auto sceneContext = _glLoader.loadMesh(_fullPath(model->filePaths.meshFile));
+	auto sceneContext = _glLoader.loadMesh(formatPath(_path, model->filePaths.meshFile));
 
 	if (!sceneContext)
 		return;
@@ -160,7 +154,7 @@ void Renderer::receive(const entityx::ComponentAddedEvent<Model>& modelAddedEven
 
 	// Texture file
 	if (model->filePaths.textureFile != "") {
-		auto textureContext = _glLoader.loadTexture(_fullPath(model->filePaths.textureFile));
+		auto textureContext = _glLoader.loadTexture(formatPath(_path, model->filePaths.textureFile));
 
 		if (textureContext)
 			model->textureContext = *textureContext;
@@ -182,7 +176,7 @@ entityx::Entity Renderer::createScene(entityx::EntityManager& entities, const st
 	if (meshFile == "")
 		return entityx::Entity();
 	
-	auto sceneContext = _glLoader.loadMesh(_fullPath(meshFile));
+	auto sceneContext = _glLoader.loadMesh(formatPath(_path, meshFile));
 	
 	if (!sceneContext)
 		return entityx::Entity();

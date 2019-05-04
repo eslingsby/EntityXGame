@@ -59,8 +59,6 @@ private:
 	glm::uvec2 _frameBufferSize;
 	entityx::Entity _camera;
 
-	std::string _fullPath(const std::string& relativePath) const;
-
 public:
 	Renderer(const ConstructorInfo& constructorInfo);
 
