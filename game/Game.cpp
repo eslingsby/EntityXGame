@@ -138,7 +138,7 @@ Game::Game(int argc, char** argv){
 		systems.system<Interface>()->setFocusedEntity(_body);
 	}
 
-	// Testing sound
+	// Testing sound 1
 	{
 		entityx::Entity sound = entities.create();
 		
@@ -148,7 +148,33 @@ Game::Game(int argc, char** argv){
 
 		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
 
-		sound.assign<Sound>();
+		sound.assign<Sound>("retrotv.wav");
+	}
+
+	// Testing sound 2
+	{
+		entityx::Entity sound = entities.create();
+
+		auto transform = sound.assign<Transform>();
+		transform->position = { 0, 5000, 1000 };
+		transform->scale = { 100, 100, 100 };
+
+		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+
+		sound.assign<Sound>("snailhorn.wav");
+	}
+
+	// Testing sound 3
+	{
+		entityx::Entity sound = entities.create();
+
+		auto transform = sound.assign<Transform>();
+		transform->position = { 5000, 0, 1000 };
+		transform->scale = { 100, 100, 100 };
+
+		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+
+		sound.assign<Sound>("crows.wav");
 	}
 
 	// Axis (with collider for each axis)

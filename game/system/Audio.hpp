@@ -40,11 +40,12 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	std::thread _thread;
 
 	entityx::Entity _listenerEntity;
-	entityx::Entity _soundEntity; // testing, just the one for now
+	//entityx::Entity _soundEntity; // testing, just the one for now
 
 	struct SourceContext {
 		bool active = true;
 
+		IPLhandle directSoundEffect = nullptr;
 		IPLhandle binauralObjectEffect = nullptr;
 		//IPLSource source;
 
@@ -53,12 +54,12 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		//IPLDirectSoundEffectOptions effectOptions;
 		//IPLDirectSoundPath soundPath;
 
-		AudioDecoder* audioDecoder;
+		AudioDecoder* audioDecoder = nullptr;;
 
 		glm::vec3 globalPosition;
 		glm::quat globalRotation;
 
-		float radius;
+		float radius = 1.f;
 
 		IPLAudioBuffer inBufferContext; // raw samples
 		IPLAudioBuffer middleBufferContext; // binarual samples
@@ -74,20 +75,26 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		uint32_t frameSize;
 
 		IPLhandle phononEnvironment = nullptr;
-		IPLhandle phononDirectSoundEffect = nullptr;
+		//IPLhandle phononDirectSoundEffect = nullptr;
 		IPLhandle phononBinauralRenderer = nullptr;
 
 		IPLDirectSoundEffectOptions effectOptions;
 
-		std::mutex positionMutex;
+		std::mutex mutex;
 
 		glm::vec3 listenerGlobalPosition;
 		glm::quat listenerGlobalRotation;
 
-		SourceContext sourceContext; // testing, just the one for now 
+		//SourceContext sourceContext; // testing, just the one for now 
 
 		std::vector<SourceContext> sourceContexts;
 		std::vector<uint32_t> freeSourceContexts;
+
+
+		std::vector<IPLAudioBuffer> unmixedBuffers;
+
+		std::vector<float> mixBuffer;
+		IPLAudioBuffer mixBufferContext; // direct sound samples
 	};
 
 public:
@@ -109,6 +116,7 @@ public:
 
 	void receive(const entityx::ComponentAddedEvent<Listener>& listenerAddedEvent);
 	void receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent);
+	void receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent);
 	void receive(const CollidingEvent& collidingEvent);
 	void receive(const ContactEvent& contactEvent);
 
