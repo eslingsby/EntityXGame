@@ -22,19 +22,23 @@
 /*
 To-do:
 - Multiple audio sources
-- Audio file loading
+- Audio file loading / streaming
 - Audio for physics events
 
-- Fix bullet coordinate scaling
-- Dynamic collision shape scaling
-- Raycasting from view / moving axis object
+- Fix bullet scaling coordinates
+- Fix colliders as children
+- Dynamic collision shape scaling / changing weight / properties
 
-- Split Game.hpp into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
+- Make GlLoader job/thread based
 
-- Transform function relative to parent hierarchy
-- Naming, find in child system, get root / hierarchy helper / destroying children / removing parents
+- Split into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
 
+- Raycasting from view / moving axis object / Focus on click 
 - Fix hover and keyboard input in imgui
+- Imgui more component fields / Scene entity table
+
+- Transform functions relative to parent
+- Find by name, find in child, root / destroying children / removing parents
 */
 
 Game::Game(int argc, char** argv){
@@ -44,6 +48,7 @@ Game::Game(int argc, char** argv){
 	auto errorLogPath = dataPath.parent_path();
 	errorLogPath.replace_filename("log.txt");
 
+	// closes file on exit, better solution later
 	static std::ofstream cerrOut(errorLogPath.string());
 	
 	std::cerr.rdbuf(cerrOut.rdbuf());
@@ -65,8 +70,12 @@ Game::Game(int argc, char** argv){
 
 	Physics::ConstructorInfo physicsInfo;
 	physicsInfo.defaultGravity = { 0, 0, -9807 };
-	physicsInfo.stepsPerUpdate = 20;
+	physicsInfo.stepsPerUpdate = 4;
 	physicsInfo.maxSubSteps = 0;
+
+	Audio::ConstructorInfo audioInfo;
+	audioInfo.sampleRate = 44100;
+	audioInfo.path = dataPath.string();
 
 	// Register systems
 	systems.add<Window>(windowInfo);
@@ -74,7 +83,7 @@ Game::Game(int argc, char** argv){
 	systems.add<Interface>();
 	systems.add<Controller>();
 	systems.add<Physics>(physicsInfo);
-	systems.add<Audio>();
+	systems.add<Audio>(audioInfo);
 
 	systems.configure();
 

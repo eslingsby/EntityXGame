@@ -19,6 +19,8 @@ struct SoundIo;
 struct SoundIoDevice;
 struct SoundIoOutStream;
 
+class AudioDecoder;
+
 class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	SoundIo* _soundIo = nullptr;;
 	SoundIoDevice* _soundIoDevice = nullptr;;
@@ -30,7 +32,10 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	IPLAudioFormat _phononMono;
 	IPLAudioFormat _phononStereo;
 
-	uint32_t _sampleRate = 44100;
+	const uint32_t _sampleRate;
+	const uint32_t _frameSize;
+
+	const std::string _path;
 
 	std::thread _thread;
 
@@ -38,13 +43,22 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	entityx::Entity _soundEntity; // testing, just the one for now
 
 	struct SourceContext {
+		bool active = true;
+
 		IPLhandle binauralObjectEffect = nullptr;
-		IPLSource source;
+		//IPLSource source;
 
-		IPLfloat32 radius;
+		//IPLfloat32 radius;
 
-		IPLDirectSoundEffectOptions effectOptions;
-		IPLDirectSoundPath soundPath;
+		//IPLDirectSoundEffectOptions effectOptions;
+		//IPLDirectSoundPath soundPath;
+
+		AudioDecoder* audioDecoder;
+
+		glm::vec3 globalPosition;
+		glm::quat globalRotation;
+
+		float radius;
 
 		IPLAudioBuffer inBufferContext; // raw samples
 		IPLAudioBuffer middleBufferContext; // binarual samples
@@ -56,30 +70,38 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		std::vector<float> outBuffer;
 	};
 
-public:
 	struct ThreadContext {
+		uint32_t frameSize;
+
 		IPLhandle phononEnvironment = nullptr;
 		IPLhandle phononDirectSoundEffect = nullptr;
 		IPLhandle phononBinauralRenderer = nullptr;
 
-		uint32_t frameSize = 2048;
+		IPLDirectSoundEffectOptions effectOptions;
 
 		std::mutex positionMutex;
 
 		glm::vec3 listenerGlobalPosition;
 		glm::quat listenerGlobalRotation;
 
-		glm::vec3 sourceGlobalPosition; // testing, just the one for now
-		glm::quat sourceGlobalRotation; // testing, just the one for now
-		
 		SourceContext sourceContext; // testing, just the one for now 
+
+		std::vector<SourceContext> sourceContexts;
+		std::vector<uint32_t> freeSourceContexts;
+	};
+
+public:
+	struct ConstructorInfo {
+		std::string path = "";
+		uint32_t sampleRate = 44100;
+		uint32_t frameSize = 1024; // 512 min
 	};
 	
 private:
 	ThreadContext _threadContext;
 
 public:
-	Audio();
+	Audio(const ConstructorInfo& constructorInfo);
 	~Audio();
 
 	void configure(entityx::EventManager &events) final;
@@ -89,4 +111,6 @@ public:
 	void receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent);
 	void receive(const CollidingEvent& collidingEvent);
 	void receive(const ContactEvent& contactEvent);
+
+	friend void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCountMax);
 };
