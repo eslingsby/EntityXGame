@@ -12,25 +12,19 @@
 #include <atomic>
 #include <mutex>
 
-//#include <audiodecoder.h> // errrrrrrr
+//#include <audiodecoder.h>
 
-/*
-Phonon uses a right-handed coordinate system, with the positive x-axis
-pointing right, the positive y-axis pointing up, and the negative
-z-axis pointing ahead. Position and direction data obtained from a
-game engine or audio engine must be properly transformed before being
-passed to any Phonon API function.
-*/
+// Copied from phonon docs: positive x-axis pointing right, positive y-axis pointing up, and the negative z-axis pointing ahead.
 IPLVector3 toPhonon(const glm::vec3& vector) {
 	return { vector.x, vector.z, -vector.y };
 }
 
 void phononLog(char* message) {
-	std::cerr << "phonon callback: " << message << std::endl;
+	std::cerr << "Audio phonon: " << message << std::endl;
 }
 
 const char* phononErrorMsg(IPLerror error) {
-	// copied over from phonon comments
+	// Copied over from phonon comments
 	switch (error) {
 		case IPL_STATUS_SUCCESS: return "operation completed successfully";
 		case IPL_STATUS_FAILURE: return "unspecified error occurred";
@@ -54,7 +48,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 
 	float hz = 440.f;
 	float step = hz * glm::two_pi<float>();
-	float amps = 0.5f;
+	float amps = 0.1f;
 	
 	int soundioError;
 
@@ -63,7 +57,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 		int frameCount = framesLeft;
 
 		if (soundioError = soundio_outstream_begin_write(outstream, &areas, &frameCount)) {
-			std::cerr << "soundio_outstream_begin_write: " << soundio_strerror(soundioError) << std::endl;
+			std::cerr << "Audio soundio_outstream_begin_write: " << soundio_strerror(soundioError) << std::endl;
 			return;
 		}
 
@@ -129,7 +123,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 
 		// close outstream
 		if (soundioError = soundio_outstream_end_write(outstream)) {
-			std::cerr << "soundio_outstream_end_write: " << soundio_strerror(soundioError) << std::endl;
+			std::cerr << "Audio soundio_outstream_end_write: " << soundio_strerror(soundioError) << std::endl;
 			return;
 		}
 
@@ -142,7 +136,7 @@ Audio::Audio() {
 	IPLerror phononError = iplCreateContext(&phononLog, nullptr, nullptr, &_phononContext); // context
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateContext: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateContext: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 
@@ -162,7 +156,7 @@ Audio::Audio() {
 	phononError = iplCreateBinauralRenderer(_phononContext, settings, hrtfParams, &_threadContext.phononBinauralRenderer); // binaural renderer
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateBinauralRenderer: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateBinauralRenderer: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 
@@ -181,7 +175,7 @@ Audio::Audio() {
 	phononError = iplCreateEnvironment(_phononContext, nullptr, simulationSettings, nullptr, nullptr, &_threadContext.phononEnvironment); // environment
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateEnvironment: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateEnvironment: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 
@@ -189,7 +183,7 @@ Audio::Audio() {
 	phononError = iplCreateEnvironmentalRenderer(_phononContext, _threadContext.phononEnvironment, settings, _phononStereo, nullptr, nullptr, &_phononEnvironmentRenderer);
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateEnvironmentalRenderer: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateEnvironmentalRenderer: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 
@@ -197,7 +191,7 @@ Audio::Audio() {
 	phononError = iplCreateDirectSoundEffect(_phononEnvironmentRenderer, _phononMono, _phononStereo, &_threadContext.phononDirectSoundEffect); // direct sound effect
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateDirectSoundEffect: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateDirectSoundEffect: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 	
@@ -210,7 +204,7 @@ Audio::Audio() {
 	int soundioError;
 
 	if (soundioError = soundio_connect(_soundIo)) {
-		std::cerr << "soundio_connect: " << soundio_strerror(soundioError) << std::endl;
+		std::cerr << "Audio soundio_connect: " << soundio_strerror(soundioError) << std::endl;
 		return;
 	}
 
@@ -227,7 +221,7 @@ Audio::Audio() {
 	if (!_soundIoDevice)
 		return;
 
-	//std::cerr << "soundio_get_output_device: " << _soundIoDevice->name << std::endl;
+	std::cerr << "Audio soundio_get_output_device: " << _soundIoDevice->name << std::endl;
 
 	// Create soundio out stream
 	_soundIoOutStream = soundio_outstream_create(_soundIoDevice);
@@ -236,15 +230,15 @@ Audio::Audio() {
 	_soundIoOutStream->userdata = &_threadContext; // set userdata to threadContext object
 
 	if (soundioError = soundio_outstream_open(_soundIoOutStream)) {
-		std::cerr << "soundio_outstream_open: " << soundio_strerror(soundioError) << std::endl;
+		std::cerr << "Audio soundio_outstream_open: " << soundio_strerror(soundioError) << std::endl;
 		return;
 	}
 
 	if (_soundIoOutStream->layout_error)
-		std::cerr << "soundio layout_error: " << soundio_strerror(_soundIoOutStream->layout_error) << std::endl;
+		std::cerr << "Audio soundio layout_error: " << soundio_strerror(_soundIoOutStream->layout_error) << std::endl;
 
 	if (soundioError = soundio_outstream_start(_soundIoOutStream)) {
-		std::cerr << "soundio_outstream_start: " << soundio_strerror(soundioError) << std::endl;
+		std::cerr << "Audio soundio_outstream_start: " << soundio_strerror(soundioError) << std::endl;
 		return;
 	}
 
@@ -252,7 +246,7 @@ Audio::Audio() {
 	phononError = iplCreateBinauralEffect(_threadContext.phononBinauralRenderer, _phononStereo, _phononStereo, &_threadContext.sourceContext.binauralObjectEffect);
 
 	if (phononError != IPL_STATUS_SUCCESS) {
-		std::cerr << "iplCreateBinauralEffect: " << phononErrorMsg(phononError) << std::endl;
+		std::cerr << "Audio iplCreateBinauralEffect: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
 

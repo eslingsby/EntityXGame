@@ -15,30 +15,43 @@
 
 #include "other\Time.hpp"
 
-#include <chrono>
 #include <experimental\filesystem>
+#include <iostream>
+#include <fstream>
 
 /*
 To-do:
-
-- Transform global translate/rotate/scale relative to parent
-
-- Dynamic collision shape scaling
-
-- Naming, find in child system, get root / hierarchy helper / destroying children / removing parents
-
+- Multiple audio sources
+- Audio file loading
 - Audio for physics events
 
-- Working keyboard input in imgui
+- Fix bullet coordinate scaling
+- Dynamic collision shape scaling
 - Raycasting from view / moving axis object
+
+- Split Game.hpp into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
+
+- Transform function relative to parent hierarchy
+- Naming, find in child system, get root / hierarchy helper / destroying children / removing parents
+
+- Fix hover and keyboard input in imgui
 */
 
 Game::Game(int argc, char** argv){
-	auto path = std::experimental::filesystem::path(argv[0]).replace_filename("data/");
+	auto dataPath = std::experimental::filesystem::path(argv[0]).replace_filename("data/");
+	
+#ifndef _DEBUG
+	auto errorLogPath = dataPath.parent_path();
+	errorLogPath.replace_filename("log.txt");
+
+	static std::ofstream cerrOut(errorLogPath.string());
+	
+	std::cerr.rdbuf(cerrOut.rdbuf());
+#endif
 
 	// Renderer system
 	Renderer::ConstructorInfo rendererInfo;
-	rendererInfo.path = path.string();
+	rendererInfo.path = dataPath.string();
 	rendererInfo.mainVertexShader = "mainVert.glsl";
 	rendererInfo.mainFragmentShader = "mainFrag.glsl";
 	rendererInfo.lineVertexShader = "lineVert.glsl";
@@ -51,7 +64,7 @@ Game::Game(int argc, char** argv){
 	windowInfo.defaultWindow.lockedCursor = false;
 
 	Physics::ConstructorInfo physicsInfo;
-	physicsInfo.defaultGravity = { 0, 0, -5000 };
+	physicsInfo.defaultGravity = { 0, 0, -9807 };
 	physicsInfo.stepsPerUpdate = 20;
 	physicsInfo.maxSubSteps = 0;
 

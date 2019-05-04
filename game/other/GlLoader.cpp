@@ -53,8 +53,10 @@ void compileShader(GLuint type, GLuint* shader, const std::string& filePath) {
 
 	stream.open(filePath, std::fstream::in);
 
-	if (!stream.is_open())
+	if (!stream.is_open()) {
+		std::cerr << "GlLoader compileShader: couldn't load " << filePath << std::endl;
 		return;
+	}
 
 	const std::string source = std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 
@@ -82,7 +84,7 @@ void compileShader(GLuint type, GLuint* shader, const std::string& filePath) {
 
 	glGetShaderInfoLog(*shader, length, &length, &message[0]);
 
-	std::cerr << message << std::endl;
+	std::cerr << "GlLoader compileShader: " << message << std::endl;
 
 	// clean-up like shader was never created
 	glDeleteShader(*shader);
@@ -250,15 +252,17 @@ const GlLoader::ProgramContext* GlLoader::loadProgram(const std::string& vertexF
 	glDeleteProgram(program);
 	program = 0;
 
-	std::cerr << message << std::endl;
+	std::cerr << "GlLoader loadProgram: " << message << std::endl;
 	return nullptr;
 }
 
 const GlLoader::TextureContext* GlLoader::loadTexture(const std::string& textureFile, bool reload) {
 	std::string texturePath = cleanPath(textureFile);
 
-	if (texturePath == "")
+	if (texturePath == "") {
+		std::cerr << "GlLoader loadTexture: no file provided" << std::endl;
 		return nullptr;
+	}
 
 	auto textureIter = _loadedTextures.find(texturePath);
 
@@ -268,8 +272,10 @@ const GlLoader::TextureContext* GlLoader::loadTexture(const std::string& texture
 	int width, height, channels;
 	uint8_t* data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
 
-	if (!data)
+	if (!data) {
+		std::cerr << "GlLoader loadTexture: couldn't load " << texturePath << std::endl;
 		return nullptr;
+	}
 
 	TextureContext& textureContext = _loadedTextures[texturePath];
 
@@ -293,8 +299,10 @@ const GlLoader::TextureContext* GlLoader::loadTexture(const std::string& texture
 const GlLoader::MeshHierarchy* GlLoader::loadMesh(const std::string& meshFile, bool reload) {
 	std::string meshPath = cleanPath(meshFile);
 
-	if (meshPath == "")
+	if (meshPath == "") {
+		std::cerr << "GlLoader loadMesh: no file provided" << std::endl;
 		return nullptr;
+	}
 
 	auto meshIter = _loadedMeshes.find(meshPath);
 
@@ -305,8 +313,15 @@ const GlLoader::MeshHierarchy* GlLoader::loadMesh(const std::string& meshFile, b
 
 	const aiScene* scene = importer.ReadFile(meshPath, aiProcessPreset_TargetRealtime_MaxQuality);
 
-	if (!scene || !scene->mNumMeshes)
+	if (!scene) {
+		std::cerr << "GlLoader loadMesh: couldn't load " << meshPath << std::endl;
 		return nullptr;
+	}
+
+	if (!scene->mNumMeshes) {
+		std::cerr << "GlLoader loadMesh: no mesh data in " << meshPath << std::endl;
+		return nullptr;
+	}
 
 	MeshHierarchy& meshHierarchy = _loadedMeshes[meshPath];
 

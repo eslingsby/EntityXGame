@@ -7,7 +7,7 @@
 
 void errorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
 	std::string errorMessage(message, message + length);
-	std::cerr << "opengl callback: " << source << ',' << type << ',' << id << ',' << severity << std::endl << errorMessage << std::endl << std::endl;
+	std::cerr << "Renderer opengl: " << source << ',' << type << ',' << id << ',' << severity << std::endl << errorMessage << std::endl << std::endl;
 }
 
 std::string Renderer::_fullPath(const std::string & relativePath) const {
@@ -54,8 +54,6 @@ Renderer::Renderer(const ConstructorInfo& constructorInfo) :
 	// Create line buffer / line program
 	glGenVertexArrays(1, &_lineBufferObject);
 	glGenBuffers(1, &_lineBuffer);
-
-	_lineProgram = *_glLoader.loadProgram(_fullPath(constructorInfo.lineVertexShader), _fullPath(constructorInfo.lineFragmentShader));
 
 	// Create uniform buffer
 	glGenBuffers(1, &_uniformBuffer);

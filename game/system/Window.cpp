@@ -132,7 +132,6 @@ void fromSdl(const uint16_t& from, uint8_t* to) {
 }
 
 void Window::_recreateWindow(entityx::EventManager & events){
-
 	if (_window)
 		_closeWindow(events);
 
@@ -145,10 +144,11 @@ void Window::_recreateWindow(entityx::EventManager & events){
 		_windowInfo.flags
 	);
 
-	//if (!_context) {
-	//	_context = SDL_GL_CreateContext(_window);
-	//	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	//}
+	
+	if (!_window) {
+		std::cerr << "Window SDL_CreateWindow: " << SDL_GetError() << std::endl;
+		return;
+	}
 	
 	assert(_context); // Context already created once in ctor
 	SDL_GL_MakeCurrent(_window, _context);
@@ -258,21 +258,42 @@ Window::Window(const ConstructorInfo& constructorInfo) :
 		_constructorInfo(constructorInfo), 
 		_windowInfo(_constructorInfo.defaultWindow) {
 
-	SDL_Init(SDL_INIT_VIDEO);
+	if (SDL_Init(SDL_INIT_VIDEO)) {
+		std::cerr << "Window SDL_Init:" << SDL_GetError() << std::endl;
+		return;
+	}
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, _constructorInfo.contextVersionMajor);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, _constructorInfo.contextVersionMinor);
+	int error = 0;
+
+	error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, _constructorInfo.contextVersionMajor);
+	error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, _constructorInfo.contextVersionMinor);
 
 	if (_constructorInfo.coreContex)
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+		error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
 	if (_constructorInfo.debugContext)
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+		error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+
+	if (error == -1) {
+		std::cerr << "Window SDL_GL_SetAttribute: " << SDL_GetError() << std::endl;
+		return;
+	}
 
 	// Create temporary window to hold OpenGL context (gets destroyed and replaced on first update)
 	_window = SDL_CreateWindow("", 0, 0, 0, 0, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
 
+	if (!_window) {
+		std::cerr << "Window SDL_CreateWindow: " << SDL_GetError() << std::endl;
+		return;
+	}
+
 	_context = SDL_GL_CreateContext(_window);
+
+	if (!_context) {
+		std::cerr << "Window SDL_GL_CreateContext: " << SDL_GetError() << std::endl;
+		return;
+	}
+
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
 
 	SDL_GL_MakeCurrent(_window, _context);
@@ -289,6 +310,9 @@ Window::~Window(){
 }
 
 void Window::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt){
+	if (!_context)
+		return;
+
 	// Check if window needs to be recreated or closed
 	if (_open && !_window)
 		_recreateWindow(events);
