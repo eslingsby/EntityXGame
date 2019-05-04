@@ -363,7 +363,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 	case 2: 
 		// middle mouse (bouncy ball)
 		transform->scale = { 500.f, 500.f, 500.f };
-		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
 
 		bodyInfo.mass = 5;
 		bodyInfo.defaultRestitution = 1.f;
@@ -462,8 +462,8 @@ int Game::run(){
 	
 		systems.update_all(dt);
 		
-		const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
-		systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
+		//const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
+		//systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
 
 		dt = deltaTime(timer);
 	}
