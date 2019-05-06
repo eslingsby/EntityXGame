@@ -12,8 +12,11 @@
 #include "system\Physics.hpp"
 #include "system\Audio.hpp"
 #include "system\Interface.hpp"
+//#include "system\Lightmaps.hpp"
 
 #include "other\Time.hpp"
+
+#include <glm\gtx\quaternion.hpp>
 
 #include <experimental\filesystem>
 #include <iostream>
@@ -21,15 +24,17 @@
 
 /*
 To-do:
-- Multiple audio sources
-- Audio file loading / streaming
 - Audio for physics events
+- Audio file sharing
+
+- Maybe model should contain GlLoader* and collider contain btRigidBodyWorld* ???
 
 - Fix bullet scaling coordinates
 - Fix colliders as children
 - Dynamic collision shape scaling / changing weight / properties
 
-- Make GlLoader job/thread based
+- Make sound loading threaded / job based
+- Make mesh and texture loading threaded / job based
 
 - Split into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
 
@@ -39,9 +44,13 @@ To-do:
 
 - Transform functions relative to parent
 - Find by name, find in child, root / destroying children / removing parents
+
+- Incoming events. I.e. build lightmap event / buffer debug lines event
 */
 
 Game::Game(int argc, char** argv){
+	srand(time(0));
+	
 	auto dataPath = std::experimental::filesystem::path(argv[0]).replace_filename("data/");
 	
 #ifndef _DEBUG
@@ -57,10 +66,10 @@ Game::Game(int argc, char** argv){
 	// Renderer system
 	Renderer::ConstructorInfo rendererInfo;
 	rendererInfo.path = dataPath.string();
-	rendererInfo.mainVertexShader = "mainVert.glsl";
-	rendererInfo.mainFragmentShader = "mainFrag.glsl";
-	rendererInfo.lineVertexShader = "lineVert.glsl";
-	rendererInfo.lineFragmentShader = "lineFrag.glsl";
+	rendererInfo.mainVertexShader = "shaders/mainVert.glsl";
+	rendererInfo.mainFragmentShader = "shaders/mainFrag.glsl";
+	rendererInfo.lineVertexShader = "shaders/lineVert.glsl";
+	rendererInfo.lineFragmentShader = "shaders/lineFrag.glsl";
 	rendererInfo.defaultTexture = "checker.png";
 
 	Window::ConstructorInfo windowInfo;
@@ -74,7 +83,8 @@ Game::Game(int argc, char** argv){
 	physicsInfo.maxSubSteps = 0;
 
 	Audio::ConstructorInfo audioInfo;
-	audioInfo.sampleRate = 44100;
+	audioInfo.sampleRate = 48000;
+	audioInfo.frameSize = 512;
 	audioInfo.path = dataPath.string();
 
 	// Register systems
@@ -84,6 +94,7 @@ Game::Game(int argc, char** argv){
 	systems.add<Controller>();
 	systems.add<Physics>(physicsInfo);
 	systems.add<Audio>(audioInfo);
+	//systems.add<Lightmaps>();
 
 	systems.configure();
 
@@ -109,7 +120,7 @@ Game::Game(int argc, char** argv){
 		bodyInfo.mass = 10;
 		bodyInfo.alwaysActive = true;
 		bodyInfo.callbacks = true;
-		bodyInfo.defaultLinearFactor = { 0, 0, 0 };
+		//bodyInfo.defaultLinearFactor = { 0, 0, 0 };
 		bodyInfo.defaultAngularFactor = { 0, 0, 0 };
 
 		auto bodyCollider = _body.assign<Collider>(Collider::ShapeInfo{ Collider::Capsule, 600.f, 600.f }, bodyInfo);
@@ -138,43 +149,40 @@ Game::Game(int argc, char** argv){
 		systems.system<Interface>()->setFocusedEntity(_body);
 	}
 
-	// Testing sound 1
-	{
-		entityx::Entity sound = entities.create();
-		
-		auto transform = sound.assign<Transform>();
-		transform->position = { 0, -5000, 1000 };
-		transform->scale = { 100, 100, 100 };
+	// Testing sounds
+	struct SoundInfo {
+		std::string soundFile;
+		float radius;
+		uint32_t falloffPower;
+	};
 
-		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+	std::vector<SoundInfo> soundInfos = {
+		{ "sounds/rain.wav", 100000.f, 4 },
+		{ "sounds/thunder.wav", 50000.f, 4 },
+		{ "sounds/crows.wav", 50000.f, 4 }
+	};
 
-		sound.assign<Sound>("retrotv.wav");
-	}
+	float radius = 5000.f;
 
-	// Testing sound 2
-	{
-		entityx::Entity sound = entities.create();
+	uint32_t count = soundInfos.size();
+	float stepDegrees = 360.f / count;
 
-		auto transform = sound.assign<Transform>();
-		transform->position = { 0, 5000, 1000 };
-		transform->scale = { 100, 100, 100 };
-
-		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
-
-		sound.assign<Sound>("snailhorn.wav");
-	}
-
-	// Testing sound 3
-	{
+	for (uint32_t i = 0; i < count; i++) {		
 		entityx::Entity sound = entities.create();
 
 		auto transform = sound.assign<Transform>();
-		transform->position = { 5000, 0, 1000 };
-		transform->scale = { 100, 100, 100 };
+		transform->scale = { 2, 2, 2 };
+		transform->rotation = glm::quat({ glm::radians(90.f + 45.f), 0, glm::radians(stepDegrees * i) });
+		transform->position = glm::toMat4(glm::quat({ 0, 0, glm::radians(stepDegrees * i) })) * glm::vec4(Transform::forward * radius, 1);
+		transform->position.z = 2000.f;
 
-		sound.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
+		sound.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
 
-		sound.assign<Sound>("crows.wav");
+		sound.assign<Sound>(soundInfos[i].soundFile, Sound::Settings{ soundInfos[i].radius, soundInfos[i].falloffPower });
+
+		sound.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 100, 100, 100 });
+
+		_sounds.push_back(sound);
 	}
 
 	// Axis (with collider for each axis)
@@ -283,15 +291,16 @@ Game::Game(int argc, char** argv){
 	}
 
 	// Testing triangle room
-	//{	
-	//	entityx::Entity scene = entities.create();
-	//
-	//	auto transform = scene.assign<Transform>();
-	//	transform->scale = { 5, 5, 5 };
-	//	transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
-	//
-	//	systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
-	//}
+	{	
+		entityx::Entity scene = entities.create();
+	
+		auto transform = scene.assign<Transform>();
+		transform->position = { 0, 10000, 100 };
+		transform->scale = { 5, 5, 5 };
+		transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
+	
+		systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
+	}
 }
 
 void Game::receive(const WindowFocusEvent& windowFocusEvent){
@@ -323,7 +332,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 		return;
 	}
 
-	// Create a bunch of junk on mouse release (testing)
+	// Create a bunch of junk on mouse events (testing)
 	if (mousePressEvent.action != Action::Press)
 		return;
 
@@ -347,6 +356,41 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 	Collider::BodyInfo bodyInfo;
 
+	if (mousePressEvent.mods & Modifier::Mod_Ctrl) {
+		switch (mousePressEvent.button) {
+		case 1:
+			// right mouse + ctrl (speaker)
+			transform->scale *= 2;
+			transform->rotation = glm::quat(glm::radians(glm::vec3{ rand() % 360, rand() % 360, rand() % 360 }));
+
+			model = testent.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
+
+			bodyInfo.mass = 10;
+			collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Cylinder, 100, 50, 50 }, bodyInfo);
+
+			switch (rand() % 4) {
+			case 0:
+				testent.assign<Sound>("sounds/rain.wav", Sound::Settings{ 100000, 10 });
+				return;
+			case 1:
+				testent.assign<Sound>("sounds/crows.wav", Sound::Settings{ 100000, 10 });
+				return;
+			case 2:
+				testent.assign<Sound>("sounds/thunder.wav", Sound::Settings{ 100000, 10 });
+				return;
+			}
+
+			return;
+
+		case 2:
+			return;
+
+		case 3:
+			return;
+		}
+	}
+
+
 	switch (mousePressEvent.button) {
 	case 1: 
 		// left mouse (heavy weight)
@@ -363,6 +407,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 	case 2: 
 		// middle mouse (bouncy ball)
 		transform->scale = { 500.f, 500.f, 500.f };
+		transform->rotation = glm::quat({ 0, 0, glm::radians((float)(rand() % 360)) });
 		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
 
 		bodyInfo.mass = 5;
@@ -462,8 +507,26 @@ int Game::run(){
 	
 		systems.update_all(dt);
 		
-		//const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
-		//systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
+		// testing
+		{
+			// Buffer physics lines to renderer
+			//const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
+			//systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
+
+			// Spin sounds for fun
+			for (auto entity : _sounds) {
+				if (!entity.has_component<Transform>())
+					continue;
+			
+				auto transform = entity.component<Transform>();
+			
+				glm::mat4 rotation = glm::toMat4(glm::quat({ 0, 0, glm::radians(20 * dt) }));
+			
+				transform->position = rotation * glm::vec4(transform->position, 1);
+			
+				transform->globalRotate(rotation);
+			}
+		}
 
 		dt = deltaTime(timer);
 	}

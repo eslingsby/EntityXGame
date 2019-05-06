@@ -40,26 +40,19 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	std::thread _thread;
 
 	entityx::Entity _listenerEntity;
-	//entityx::Entity _soundEntity; // testing, just the one for now
 
 	struct SourceContext {
 		bool active = true;
 
 		IPLhandle directSoundEffect = nullptr;
 		IPLhandle binauralObjectEffect = nullptr;
-		//IPLSource source;
 
-		//IPLfloat32 radius;
-
-		//IPLDirectSoundEffectOptions effectOptions;
-		//IPLDirectSoundPath soundPath;
-
-		AudioDecoder* audioDecoder = nullptr;;
+		AudioDecoder* audioDecoder = nullptr;
 
 		glm::vec3 globalPosition;
 		glm::quat globalRotation;
 
-		float radius = 1.f;
+		Sound::Settings soundSettings;
 
 		IPLAudioBuffer inBufferContext; // raw samples
 		IPLAudioBuffer middleBufferContext; // binarual samples
@@ -69,13 +62,15 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		std::vector<float> inBuffer;
 		std::vector<float> middleBuffer;
 		std::vector<float> outBuffer;
+		//float* inBuffer;
+		//float* middleBuffer;
+		//float* outBuffer;
 	};
 
 	struct ThreadContext {
 		uint32_t frameSize;
 
 		IPLhandle phononEnvironment = nullptr;
-		//IPLhandle phononDirectSoundEffect = nullptr;
 		IPLhandle phononBinauralRenderer = nullptr;
 
 		IPLDirectSoundEffectOptions effectOptions;
@@ -85,16 +80,17 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		glm::vec3 listenerGlobalPosition;
 		glm::quat listenerGlobalRotation;
 
-		//SourceContext sourceContext; // testing, just the one for now 
-
 		std::vector<SourceContext> sourceContexts;
 		std::vector<uint32_t> freeSourceContexts;
 
-
+		//void* memoryBuffer = nullptr;
+		//uint32_t memoryCounter = 0;
+	
 		std::vector<IPLAudioBuffer> unmixedBuffers;
 
 		std::vector<float> mixBuffer;
-		IPLAudioBuffer mixBufferContext; // direct sound samples
+		//float* mixBuffer;
+		IPLAudioBuffer mixBufferContext;
 	};
 
 public:

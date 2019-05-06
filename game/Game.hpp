@@ -21,6 +21,7 @@ class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 	bool _tDown = false;
 
 	std::vector<entityx::Entity> _sandbox;
+	std::vector<entityx::Entity> _sounds;
 public:
 	Game(int argc, char** argv);
 

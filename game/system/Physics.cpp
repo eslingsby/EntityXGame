@@ -172,12 +172,12 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
 
 	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
-	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
+	collider->setLinearFactor(collider->bodyInfo.defaultLinearFactor);
 	collider->setFriction(collider->bodyInfo.defaultFriction);
 	collider->setRestitution(collider->bodyInfo.defaultRestitution);
 
 	collider->setAngularVelocity(collider->bodyInfo.startingAngularVelocity);
-	collider->setAngularVelocity(collider->bodyInfo.startingLinearVelocity);
+	collider->setLinearVelocity(collider->bodyInfo.startingLinearVelocity);
 
 	if (collider->bodyInfo.alwaysActive)
 		collider->setAlwaysActive(true);

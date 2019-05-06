@@ -2,7 +2,20 @@
 
 struct Sound {
 	const std::string soundFile;
-	uint32_t sourceContextIndex;
+	int sourceContextIndex = -1;
 
-	Sound(const std::string& soundFile) : soundFile(soundFile) {};
+	struct Settings {
+		float radius = 10000.f;
+		uint32_t falloffPower = 3;
+
+		// currently ignored
+		bool playing = true;
+		bool loop = true;
+		bool attenuated = true;
+		bool binaural = true;
+
+		double seek = 0.0;
+	} settings;
+
+	Sound(const std::string& soundFile, const Settings& settings) : soundFile(soundFile), settings(settings) {};
 };
