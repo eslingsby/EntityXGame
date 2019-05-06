@@ -16,6 +16,8 @@ struct Model{
 
 	const FilePaths filePaths;
 
+	float textureScale = 1.f;
+
 	GlLoader::MeshContext meshContext;
 	GlLoader::TextureContext textureContext;
 

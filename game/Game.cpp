@@ -12,7 +12,7 @@
 #include "system\Physics.hpp"
 #include "system\Audio.hpp"
 #include "system\Interface.hpp"
-//#include "system\Lightmaps.hpp"
+#include "system\Lightmaps.hpp"
 
 #include "other\Time.hpp"
 
@@ -94,7 +94,7 @@ Game::Game(int argc, char** argv){
 	systems.add<Controller>();
 	systems.add<Physics>(physicsInfo);
 	systems.add<Audio>(audioInfo);
-	//systems.add<Lightmaps>();
+	systems.add<Lightmaps>();
 
 	systems.configure();
 
