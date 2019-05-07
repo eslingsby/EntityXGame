@@ -14,13 +14,7 @@
 #include "system\Interface.hpp"
 #include "system\Lightmaps.hpp"
 
-#include "other\Time.hpp"
-
 #include <glm\gtx\quaternion.hpp>
-
-#include <experimental\filesystem>
-#include <iostream>
-#include <fstream>
 
 /*
 To-do:
@@ -34,8 +28,6 @@ To-do:
 - Fix hover and keyboard input in imgui
 
 Less important:
-- Split into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
-
 - Raycasting from view / moving axis object / Focus on click
 - Imgui more component fields / Scene entity table
 
@@ -47,63 +39,7 @@ Less important:
 - Model have contain GlLoader* and collider contain btRigidBodyWorld* ???
 */
 
-Game::Game(int argc, char** argv){
-	srand(time(0));
-	
-	auto dataPath = std::experimental::filesystem::path(argv[0]).replace_filename("data/");
-	
-#ifndef _DEBUG
-	auto errorLogPath = dataPath.parent_path();
-	errorLogPath.replace_filename("log.txt");
-
-	// closes file on exit, better solution later
-	static std::ofstream cerrOut(errorLogPath.string());
-	
-	std::cerr.rdbuf(cerrOut.rdbuf());
-#endif
-
-	// Renderer system
-	Renderer::ConstructorInfo rendererInfo;
-	rendererInfo.path = dataPath.string();
-	rendererInfo.mainVertexShader = "shaders/mainVert.glsl";
-	rendererInfo.mainFragmentShader = "shaders/mainFrag.glsl";
-	rendererInfo.lineVertexShader = "shaders/lineVert.glsl";
-	rendererInfo.lineFragmentShader = "shaders/lineFrag.glsl";
-	rendererInfo.defaultTexture = "checker.png";
-
-	Window::ConstructorInfo windowInfo;
-	//windowInfo.debugContext = true;
-	windowInfo.defaultWindow.title = "EntityX Game";
-	windowInfo.defaultWindow.lockedCursor = false;
-
-	Physics::ConstructorInfo physicsInfo;
-	physicsInfo.defaultGravity = { 0, 0, -9807 };
-	physicsInfo.stepsPerUpdate = 4;
-	physicsInfo.maxSubSteps = 0;
-
-	Audio::ConstructorInfo audioInfo;
-	audioInfo.sampleRate = 48000;
-	//audioInfo.sampleRate = 44100;
-	audioInfo.frameSize = 512;
-	audioInfo.path = dataPath.string();
-
-	// Register systems
-	systems.add<Window>(windowInfo);
-	systems.add<Renderer>(rendererInfo);
-	systems.add<Interface>();
-	systems.add<Controller>();
-	systems.add<Physics>(physicsInfo);
-	systems.add<Audio>(audioInfo);
-	systems.add<Lightmaps>();
-
-	systems.configure();
-
-	// Register events
-	events.subscribe<WindowFocusEvent>(*this);
-	events.subscribe<MousePressEvent>(*this);
-	events.subscribe<WindowOpenEvent>(*this);
-	events.subscribe<KeyInputEvent>(*this);
-
+Game::Game(int argc, char** argv) : Engine(argc, argv){
 	// Setup Test entities
 	_spawnLocation = { 0, -5000, 0 };
 	
@@ -160,7 +96,7 @@ Game::Game(int argc, char** argv){
 		{ "sounds/rain.wav", 80000.f, 4 },
 		{ "sounds/thunder.wav", 80000.f, 4 },
 		{ "sounds/crows.wav", 80000.f, 4 },
-		{ "Ghost.mp3", 80000.f, 8 }
+		//{ "Ghost.mp3", 80000.f, 8 }
 	};
 
 	float radius = 5000.f;
@@ -308,34 +244,8 @@ Game::Game(int argc, char** argv){
 	}
 }
 
-void Game::receive(const WindowFocusEvent& windowFocusEvent){
-	if (!windowFocusEvent.focused && systems.system<Window>()->windowInfo().lockedCursor) {
-		systems.system<Window>()->lockCursor(false);
-		systems.system<Controller>()->setEnabled(false);
-		systems.system<Interface>()->setInputEnabled(true);
-	}
-}
-
 void Game::receive(const MousePressEvent& mousePressEvent){
-	if (mousePressEvent.action == Action::Press && systems.system<Interface>()->isHovering()) {
-		_wasHovering = true;
-		return;
-	}
-	else if (systems.system<Interface>()->isHovering()) {
-		return;
-	}
-
-	if (_wasHovering && mousePressEvent.action == Action::Release) {
-		_wasHovering = false;
-		return;
-	}
-
-	if (!systems.system<Window>()->windowInfo().lockedCursor) {
-		systems.system<Window>()->lockCursor(true);
-		systems.system<Controller>()->setEnabled(true);
-		systems.system<Interface>()->setInputEnabled(false);
-		return;
-	}
+	Engine::receive(mousePressEvent);
 
 	// Create a bunch of junk on mouse events (testing)
 	if (mousePressEvent.action != Action::Press)
@@ -375,13 +285,13 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 			switch (rand() % 3) {
 			case 0:
-				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
+				testent.assign<Sound>("sounds/crows.wav", Sound::Settings{ 50000, 32 });
 				return;
 			case 1:
-				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
+				testent.assign<Sound>("sounds/rain.wav", Sound::Settings{ 50000, 32 });
 				return;
 			case 2:
-				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
+				testent.assign<Sound>("sounds/thunder.wav", Sound::Settings{ 50000, 32 });
 				return;
 			}
 
@@ -436,29 +346,11 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 	}
 }
 
-void Game::receive(const WindowOpenEvent& windowOpenEvent){
-	if (!windowOpenEvent.opened)
-		_running = false;
-}
-
 void Game::receive(const KeyInputEvent& keyInputEvent){
+	Engine::receive(keyInputEvent);
+
+	// Spawn stuff
 	switch (keyInputEvent.key) {
-	case Key_Escape:
-		// unlock mouse, or quit
-		if (keyInputEvent.action != Action::Press)
-			return;
-
-		if (systems.system<Window>()->windowInfo().lockedCursor) {
-			systems.system<Window>()->lockCursor(false);
-			systems.system<Controller>()->setEnabled(false);
-			systems.system<Interface>()->setInputEnabled(true);
-		}
-		else {
-			_running = false;
-		}
-
-		return;
-
 	case Key_R: 
 		// clean-up
 		if (keyInputEvent.action == Action::Press && !_rDown) {
@@ -506,38 +398,24 @@ void Game::receive(const KeyInputEvent& keyInputEvent){
 	}
 }
 
-int Game::run(){
-	TimePoint timer;
-	double dt = 0.0;
-	
-	while (_running) {
-		startTime(&timer);
-	
-		systems.update_all(dt);
-		
-		// testing
-		{
-			// Buffer physics lines to renderer
-			//const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
-			//systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
+void Game::update(double dt){
+	Engine::update(dt);
 
-			// Spin sounds for fun
-			for (auto entity : _sounds) {
-				if (!entity.has_component<Transform>())
-					continue;
-			
-				auto transform = entity.component<Transform>();
-			
-				glm::mat4 rotation = glm::toMat4(glm::quat({ 0, 0, glm::radians(20 * dt) }));
-			
-				transform->position = rotation * glm::vec4(transform->position, 1);
-			
-				transform->globalRotate(rotation);
-			}
-		}
+	// Buffer physics lines to renderer
+	const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
+	systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
 
-		dt = deltaTime(timer);
+	// Spin sounds for fun
+	for (auto entity : _sounds) {
+		if (!entity.has_component<Transform>())
+			continue;
+
+		auto transform = entity.component<Transform>();
+
+		glm::mat4 rotation = glm::toMat4(glm::quat({ 0, 0, glm::radians(20 * dt) }));
+
+		transform->position = rotation * glm::vec4(transform->position, 1);
+
+		transform->globalRotate(rotation);
 	}
-	
-	return _error;
 }

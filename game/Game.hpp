@@ -1,15 +1,8 @@
 #pragma once
 
-#include <entityx\entityx.h>
+#include "Engine.hpp"
 
-#include "system\WindowEvents.hpp"
-
-#include <glm\vec3.hpp>
-
-class Game : public entityx::EntityX, public entityx::Receiver<Game> {
-	bool _running = true;
-	int _error = 0;
-
+class Game : public Engine {
 	entityx::Entity _body;
 	entityx::Entity _head;
 
@@ -25,10 +18,8 @@ class Game : public entityx::EntityX, public entityx::Receiver<Game> {
 public:
 	Game(int argc, char** argv);
 
-	void receive(const WindowFocusEvent& windowFocusEvent);
-	void receive(const MousePressEvent& mousePressEvent);
-	void receive(const WindowOpenEvent& windowOpenEvent);
-	void receive(const KeyInputEvent& keyInputEvent);
+	void receive(const MousePressEvent& mousePressEvent) final;
+	void receive(const KeyInputEvent& keyInputEvent) final;
 
-	int run();
+	void update(double dt) final;
 };
