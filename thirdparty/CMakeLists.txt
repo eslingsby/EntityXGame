@@ -59,7 +59,7 @@ option(ENTITYX_BUILD_SHARED "" OFF)
 option(ENTITYX_BUILD_TESTING "" OFF)
 
 #add_external_tar("entityx-1.1.2" "https://github.com/alecthomas/entityx/archive/1.1.2.tar.gz" "")
-add_external_tar("alecthomas-entityx-8262569" "https://codeload.github.com/alecthomas/entityx/legacy.tar.gz/8262569ed32a0c3a21321967cd61e6be8a6a90fb" "") # this almost certainly is not a long-term solution
+add_external_tar("alecthomas-entityx-8262569" "https://codeload.github.com/alecthomas/entityx/legacy.tar.gz/8262569ed32a0c3a21321967cd61e6be8a6a90fb" "")
 
 target_include_directories("entityx" PUBLIC
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/entityx-1.1.2>"
@@ -134,8 +134,6 @@ set_target_properties("libsoundio_static" PROPERTIES FOLDER "Thirdparty")
 set_target_properties("doc" PROPERTIES FOLDER "Thirdparty")
 
 ############# Steam audio #############
-
-
 if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/steamaudio_api/include/phonon.h")
 	download_extract_tar("steamaudio_api" "https://github.com/ValveSoftware/steam-audio/releases/download/v2.0-beta.17/steamaudio_api_2.0-beta.17.zip")
 endif()
@@ -150,14 +148,16 @@ if (MSVC)
 	endif()
 endif()
 
-############# libaudiodecoder #############
-if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libaudiodecoder-master/include/audiodecoder.h")
-	download_extract_zip("libaudiodecoder-master" "https://github.com/asantoni/libaudiodecoder/archive/master.zip")
-endif()
+############# libnyquist #############
+option(BUILD_EXAMPLE "" OFF)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libaudiodecoder-master/")
+add_external_tar("ddiakopoulos-libnyquist-ae0f455" "https://codeload.github.com/ddiakopoulos/libnyquist/legacy.tar.gz/ae0f4556150ced49615c75a0b9e8d6cf11ab50bd" "")
 
-set_target_properties("libaudiodecoder" PROPERTIES FOLDER "Thirdparty")
+target_include_directories("libnyquist" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ddiakopoulos-libnyquist-ae0f455/include")
+
+set_target_properties("libnyquist" PROPERTIES FOLDER "Thirdparty")
+set_target_properties("libopus" PROPERTIES FOLDER "Thirdparty")
+set_target_properties("libwavpack" PROPERTIES FOLDER "Thirdparty")
 
 ############# RapidJson #############
 #option(RAPIDJSON_BUILD_DOC "" OFF)

@@ -16,4 +16,4 @@ Currently only working with CMake Visual Studio 15 2017 generator on Windows. Th
 - ImGui, User interface, [github.com/ocornut/imgui](http://github.com/ocornut/imgui)
 - libsoundio, Sound buffer, [github.com/andrewrk/libsoundio](http://github.com/andrewrk/libsoundio)
 - Steam Audio, Audio spatialization, [valvesoftware.github.io/steam-audio/](http://valvesoftware.github.io/steam-audio/)
-- libaudiodecoder, Sound loading, [github.com/asantoni/libaudiodecoder](http://github.com/asantoni/libaudiodecoder)
+- libnyquist, Sound loading, [github.com/ddiakopoulos/libnyquist](http://github.com/ddiakopoulos/libnyquist)

@@ -332,3 +332,36 @@ const GlLoader::MeshHierarchy* GlLoader::loadMesh(const std::string& meshFile, b
 
 	return &meshHierarchy;
 }
+
+void GlLoader::getTextures(std::vector<TextureContext>* textureContexts) const {
+	assert(textureContexts);
+	textureContexts->reserve(_loadedTextures.size());
+
+	for (auto i : _loadedTextures)
+		textureContexts->push_back(i.second);
+}
+
+void GlLoader::getMeshes(std::vector<MeshContext>* meshContexts) const {
+	assert(meshContexts);
+	meshContexts->reserve(_loadedMeshes.size());
+
+	for (auto i : _loadedMeshes)
+		for (auto context : i.second.meshContexts)
+			meshContexts->push_back(context);
+}
+
+void GlLoader::mapMesh(const MeshContext& meshContext, MeshData* meshData){
+
+}
+
+void GlLoader::unmapMesh(const MeshContext& meshContext){
+
+}
+
+void GlLoader::mapTexture(const TextureContext& textureContext, TextureData* textureData){
+
+}
+
+void GlLoader::unmapTexture(const TextureContext& textureContext){
+
+}

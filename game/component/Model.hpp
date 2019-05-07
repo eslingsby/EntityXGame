@@ -16,10 +16,12 @@ struct Model{
 
 	const FilePaths filePaths;
 
-	float textureScale = 1.f;
+	glm::vec2 textureScale{ 1, 1 };
 
 	GlLoader::MeshContext meshContext;
 	GlLoader::TextureContext textureContext;
+
+	GlLoader* glLoader = nullptr;
 
 	Model(FilePaths filePaths);
 

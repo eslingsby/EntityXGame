@@ -9,8 +9,9 @@ in vec2 texcoord;
 layout (location = 0) out vec4 fragColour;
 
 uniform sampler2D texture;
+uniform vec2 textureScale;
 
 void main(){
-	fragColour = texture2D(texture, texcoord).rgba;
+	fragColour = texture2D(texture, texcoord * textureScale).rgba;
 	//fragColour = vec4(1, 0, 0, 1);
 };

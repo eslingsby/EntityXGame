@@ -14,12 +14,11 @@
 #include <glm\gtc\quaternion.hpp>
 
 #include <phonon.h>
+#include <libnyquist\Decoders.h>
 
 struct SoundIo;
 struct SoundIoDevice;
 struct SoundIoOutStream;
-
-class AudioDecoder;
 
 class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	SoundIo* _soundIo = nullptr;;
@@ -41,13 +40,18 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 
 	entityx::Entity _listenerEntity;
 
+	nqr::NyquistIO _audioLoader;
+
+	std::unordered_map<std::string, nqr::AudioData> _loadedSounds;
+	
 	struct SourceContext {
 		bool active = true;
 
 		IPLhandle directSoundEffect = nullptr;
 		IPLhandle binauralObjectEffect = nullptr;
 
-		AudioDecoder* audioDecoder = nullptr;
+		const nqr::AudioData* audioData;
+		uint32_t currentSample = 0;
 
 		glm::vec3 globalPosition;
 		glm::quat globalRotation;
@@ -62,9 +66,6 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 		std::vector<float> inBuffer;
 		std::vector<float> middleBuffer;
 		std::vector<float> outBuffer;
-		//float* inBuffer;
-		//float* middleBuffer;
-		//float* outBuffer;
 	};
 
 	struct ThreadContext {
@@ -82,16 +83,12 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 
 		std::vector<SourceContext> sourceContexts;
 		std::vector<uint32_t> freeSourceContexts;
-
-		//void* memoryBuffer = nullptr;
-		//uint32_t memoryCounter = 0;
 	
 		std::vector<IPLAudioBuffer> unmixedBuffers;
 
 		std::vector<float> mixBuffer;
-		//float* mixBuffer;
 		IPLAudioBuffer mixBufferContext;
-	};
+	} _threadContext;
 
 public:
 	struct ConstructorInfo {
@@ -99,9 +96,6 @@ public:
 		uint32_t sampleRate = 44100;
 		uint32_t frameSize = 1024; // 512 min
 	};
-	
-private:
-	ThreadContext _threadContext;
 
 public:
 	Audio(const ConstructorInfo& constructorInfo);

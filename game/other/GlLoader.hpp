@@ -55,6 +55,22 @@ public:
 		//uint32_t boneIndexesAttrLoc = 7;
 	};
 
+	struct MeshData {
+		const glm::vec3* positions = nullptr;
+		uint32_t positionCount = 0;
+
+		const glm::vec2* texcoords = nullptr;
+		uint32_t texcoordCount = 0;
+
+		const glm::vec3* normals = nullptr;
+		uint32_t normalCount = 0;
+	};
+
+	struct TextureData {
+		const glm::tvec4<uint8_t>* colours = nullptr;
+		glm::uvec2 size;
+	};
+
 private:
 	const AttributeInfo _attributeInfo;
 
@@ -69,4 +85,13 @@ public:
 	const ProgramContext* loadProgram(const std::string& vertexFile, const std::string& fragmentFile, bool reload = false);
 	const TextureContext* loadTexture(const std::string& textureFile, bool reload = false);
 	const MeshHierarchy* loadMesh(const std::string& meshFile, bool reload = false);
+
+	void getTextures(std::vector<TextureContext>* textureContexts) const;
+	void getMeshes(std::vector<MeshContext>* meshContexts) const;
+
+	void mapMesh(const MeshContext& meshContext, MeshData* meshData);
+	void unmapMesh(const MeshContext& meshContext);
+
+	void mapTexture(const TextureContext& textureContext, TextureData* textureData);
+	void unmapTexture(const TextureContext& textureContext);
 };

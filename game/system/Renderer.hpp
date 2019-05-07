@@ -17,6 +17,7 @@ public:
 	struct UniformNames {
 		std::string modelMatrix = "model";
 		std::string textureSampler = "texture";
+		std::string textureScale = "textureScale";
 		std::string globalMatricesStruct = "GlobalMatrices";
 		//std::string bonesArray = "bones";
 	};

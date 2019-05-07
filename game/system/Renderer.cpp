@@ -111,9 +111,7 @@ void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& e
 
 	GLint modelLocation = glGetUniformLocation(_mainProgram.program, _uniformNames.modelMatrix.c_str());
 	GLint textureLocation = glGetUniformLocation(_mainProgram.program, _uniformNames.textureSampler.c_str());
-	
-	if (modelLocation == -1 || textureLocation == -1)
-		return;
+	GLint textureScaleLocation = glGetUniformLocation(_mainProgram.program, _uniformNames.textureScale.c_str());
 
 	for (auto entity : entities.entities_with_components<Transform, Model>()) {
 		const Transform& transform = *entity.component<Transform>().get();
@@ -123,11 +121,17 @@ void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& e
 			continue;
 	
 		// bind model matrix
-		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, &transform.globalMatrix()[0][0]);
+		if (modelLocation != -1)
+			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, &transform.globalMatrix()[0][0]);
 	
 		// bind texture
-		glBindTexture(GL_TEXTURE_2D, model.textureContext.textureBuffer);
-		glUniform1i(textureLocation, 0);
+		if (textureLocation != -1) {
+			glBindTexture(GL_TEXTURE_2D, model.textureContext.textureBuffer);
+			glUniform1i(textureLocation, 0);
+		}
+
+		if (textureScaleLocation != -1)
+			glUniform2fv(textureScaleLocation, 1, &model.textureScale[0]);
 	
 		// draw
 		glBindVertexArray(model.meshContext.arrayObject);

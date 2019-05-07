@@ -9,8 +9,6 @@
 
 #include <soundio\soundio.h>
 
-#include <audiodecoder.h>
-
 // Copied from phonon documentation: positive x-axis pointing right, positive y-axis pointing up, and the negative z-axis pointing ahead.
 IPLVector3 toPhonon(const glm::vec3& vector) {
 	return { vector.x, vector.z, -vector.y };
@@ -54,31 +52,50 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 			return;
 		}
 
-		if (!frameCount)
+		if (frameCount <= 0)
 			break;
 
 		threadContext.unmixedBuffers.clear();
 	
-		for (Audio::SourceContext& currentSourceContext : threadContext.sourceContexts) {
-			if (!currentSourceContext.active)
+		for (Audio::SourceContext& sourceContext : threadContext.sourceContexts) {
+			if (!sourceContext.active)
 				continue;
+	
+			uint32_t channels = sourceContext.audioData->channelCount;
+			uint32_t samplesAvailable = frameCount * channels;
+			uint32_t audioSampleCount = sourceContext.audioData->samples.size();
+
+			// Non looping file that's at the end
+			if (sourceContext.currentSample == audioSampleCount)
+				continue;
+
+			uint32_t samplesToFill = samplesAvailable;
 			
-			// set sample count
-			threadContext.mixBufferContext.numSamples = frameCount;
-			currentSourceContext.inBufferContext.numSamples = frameCount;
-			currentSourceContext.middleBufferContext.numSamples = frameCount;
-			currentSourceContext.outBufferContext.numSamples = frameCount;
-
-			// buffer sound file sample data (testing)
-			uint32_t channels = currentSourceContext.audioDecoder->channels();
-
-			int framesGot = currentSourceContext.audioDecoder->read(frameCount * channels, &currentSourceContext.inBuffer[0]);
-
-			if (framesGot < (frameCount * channels)) {
-				currentSourceContext.audioDecoder->seek(0);
-				currentSourceContext.audioDecoder->read((frameCount * channels) - framesGot, &currentSourceContext.inBuffer[framesGot]);
+			while (samplesToFill) {
+				// get amount of samples, or whatever is leftover
+				uint32_t samplesGot = glm::min(audioSampleCount - sourceContext.currentSample, samplesToFill);
+			
+				for (uint32_t i = 0; i < samplesGot; i++)
+					sourceContext.inBuffer[samplesAvailable - samplesToFill + i] = sourceContext.audioData->samples[sourceContext.currentSample + i];
+			
+				samplesToFill -= samplesGot;
+				sourceContext.currentSample += samplesGot;
+			
+				// reached end of audio data
+				if (samplesGot <= samplesToFill) {
+					if (!sourceContext.soundSettings.loop)
+						break;
+			
+					sourceContext.currentSample = 0;
+				}
 			}
-			
+
+			// Tell phonon how many samples soundio wants
+			threadContext.mixBufferContext.numSamples = frameCount;
+			sourceContext.inBufferContext.numSamples = frameCount;
+			sourceContext.middleBufferContext.numSamples = frameCount;
+			sourceContext.outBufferContext.numSamples = frameCount;
+
 			// Calculate direct path (seems broken until environment data is given to phonon???)
 			//IPLDirectivity directivity;
 			//directivity.dipoleWeight = 0;
@@ -86,48 +103,53 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 			
 			//IPLSource source;
 			//source.directivity = directivity;
-			//source.position = toPhonon(currentSourceContext.globalPosition); // game units are cm, steam audio is in meters
-			//source.ahead = toPhonon(currentSourceContext.globalRotation * Transform::forward);
-			//source.up = toPhonon(currentSourceContext.globalRotation * Transform::up);
+			//source.position = toPhonon(sourceContext.globalPosition); // game units are cm, steam audio is in meters
+			//source.ahead = toPhonon(sourceContext.globalRotation * Transform::forward);
+			//source.up = toPhonon(sourceContext.globalRotation * Transform::up);
 			
 			//IPLVector3 listenerGlobalPosition = toPhonon(threadContext.listenerGlobalPosition); // cm to meters
 			//IPLVector3 listenerGlobalPositionForward = toPhonon(threadContext.listenerGlobalRotation * Transform::forward);
 			//IPLVector3 listenerGlobalPositionUp = toPhonon(threadContext.listenerGlobalRotation * Transform::up);
 			
-			//IPLDirectSoundPath soundPath = iplGetDirectSoundPath(threadContext.phononEnvironment, listenerGlobalPosition, listenerGlobalPositionForward, listenerGlobalPositionUp, source, currentSourceContext.radius, IPL_DIRECTOCCLUSION_NONE, IPL_DIRECTOCCLUSION_RAYCAST);
+			//IPLDirectSoundPath soundPath = iplGetDirectSoundPath(threadContext.phononEnvironment, listenerGlobalPosition, listenerGlobalPositionForward, listenerGlobalPositionUp, source, sourceContext.radius, IPL_DIRECTOCCLUSION_NONE, IPL_DIRECTOCCLUSION_RAYCAST);
 
 			// Apply distance attenutation
 			IPLDirectSoundPath soundPath; // create blank one instead (testing)
 
-			float distance = glm::length(threadContext.listenerGlobalPosition - currentSourceContext.globalPosition);
+			float distance = glm::length(threadContext.listenerGlobalPosition - sourceContext.globalPosition);
 
-			soundPath.distanceAttenuation = glm::clamp(1.f - (distance * 1.f / currentSourceContext.soundSettings.radius), 0.f, 1.f);
+			soundPath.distanceAttenuation = glm::clamp(1.f - (distance * 1.f / sourceContext.soundSettings.radius), 0.f, 1.f);
 
 			// If outside radius, skip applying and mixing (causes click noises on enter radius???)
-			//if (soundPath.distanceAttenuation == 0.f)
-			//	continue;
+			if (soundPath.distanceAttenuation == 0.f)
+				continue;
 
-			soundPath.distanceAttenuation = glm::pow(soundPath.distanceAttenuation, currentSourceContext.soundSettings.falloffPower);
+			soundPath.distanceAttenuation = glm::pow(soundPath.distanceAttenuation, sourceContext.soundSettings.falloffPower);
 
 			// Apply direct sound path
-			iplApplyDirectSoundEffect(currentSourceContext.directSoundEffect, currentSourceContext.inBufferContext, soundPath, threadContext.effectOptions, currentSourceContext.middleBufferContext);
+			iplApplyDirectSoundEffect(sourceContext.directSoundEffect, sourceContext.inBufferContext, soundPath, threadContext.effectOptions, sourceContext.middleBufferContext);
 
 			// Apply binaural
-			IPLVector3 direction = toPhonon(glm::inverse(threadContext.listenerGlobalRotation) * glm::normalize(currentSourceContext.globalPosition - threadContext.listenerGlobalPosition));
+			IPLVector3 direction = toPhonon(glm::inverse(threadContext.listenerGlobalRotation) * glm::normalize(sourceContext.globalPosition - threadContext.listenerGlobalPosition));
 
-			iplApplyBinauralEffect(currentSourceContext.binauralObjectEffect, threadContext.phononBinauralRenderer, currentSourceContext.middleBufferContext, direction, IPL_HRTFINTERPOLATION_BILINEAR, currentSourceContext.outBufferContext);
+			iplApplyBinauralEffect(sourceContext.binauralObjectEffect, threadContext.phononBinauralRenderer, sourceContext.middleBufferContext, direction, IPL_HRTFINTERPOLATION_BILINEAR, sourceContext.outBufferContext);
 		
-			threadContext.unmixedBuffers.push_back(currentSourceContext.outBufferContext);
+			threadContext.unmixedBuffers.push_back(sourceContext.outBufferContext);
 		}
 
-		iplMixAudioBuffers(threadContext.unmixedBuffers.size(), &threadContext.unmixedBuffers[0], threadContext.mixBufferContext);
+		// If buffers to mix, mix with phonon
+		if (threadContext.unmixedBuffers.size())
+			iplMixAudioBuffers(threadContext.unmixedBuffers.size(), &threadContext.unmixedBuffers[0], threadContext.mixBufferContext);
 
-		// copy over out buffer to outstream
+		// If mixed buffers, copy over buffer to outstream. Else copy over 0.f
 		for (int frame = 0; frame < frameCount; frame += 1) {
 			for (int channel = 0; channel < outstream->layout.channel_count; channel += 1) {
 				float *ptr = (float*)(areas[channel].ptr + areas[channel].step * frame);
 
-				*ptr = threadContext.mixBuffer[frame * 2 + channel];
+				if (threadContext.unmixedBuffers.size())
+					*ptr = threadContext.mixBuffer[frame * 2 + channel];
+				else
+					*ptr = 0.f;
 			}
 		}
 
@@ -141,7 +163,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 	}
 }
 
-Audio::Audio(const ConstructorInfo& constructorInfo) : _sampleRate(constructorInfo.sampleRate), _frameSize(constructorInfo.frameSize), _path(constructorInfo.path){
+Audio::Audio(const ConstructorInfo& constructorInfo) : _sampleRate(constructorInfo.sampleRate), _frameSize(constructorInfo.frameSize), _path(constructorInfo.path) {
 	// Create phonon context
 	IPLerror phononError = iplCreateContext(&phononLog, nullptr, nullptr, &_phononContext); // context
 
@@ -157,9 +179,8 @@ Audio::Audio(const ConstructorInfo& constructorInfo) : _sampleRate(constructorIn
 	_phononMono.channelLayout = IPL_CHANNELLAYOUT_MONO;
 	_phononMono.channelOrder = IPL_CHANNELORDER_INTERLEAVED;
 
-	_phononStereo.channelLayoutType = IPL_CHANNELLAYOUTTYPE_SPEAKERS;
+	_phononStereo = _phononMono;
 	_phononStereo.channelLayout = IPL_CHANNELLAYOUT_STEREO;
-	_phononStereo.channelOrder = IPL_CHANNELORDER_INTERLEAVED;
 
 	_threadContext.mixBuffer.resize(_frameSize * 2);
 	_threadContext.mixBufferContext.numSamples = _frameSize;
@@ -203,7 +224,7 @@ Audio::Audio(const ConstructorInfo& constructorInfo) : _sampleRate(constructorIn
 		std::cerr << "Audio iplCreateEnvironmentalRenderer: " << phononErrorMsg(phononError) << std::endl;
 		return;
 	}
-	
+
 	// Create soundio context
 	_soundIo = soundio_create();
 
@@ -276,11 +297,6 @@ Audio::~Audio(){
 	soundio_destroy(_soundIo);
 
 	// cleanup steam audio
-	//for (SourceContext& sourceContext : _threadContext.sourceContexts) {
-	//	iplDestroyBinauralEffect(&sourceContext.binauralObjectEffect);
-	//	iplDestroyDirectSoundEffect(&sourceContext.directSoundEffect);
-	//}
-
 	iplDestroyEnvironmentalRenderer(&_phononEnvironmentRenderer);
 	iplDestroyEnvironment(&_threadContext.phononEnvironment);
 	iplDestroyBinauralRenderer(&_threadContext.phononBinauralRenderer);
@@ -329,24 +345,36 @@ void Audio::receive(const entityx::ComponentAddedEvent<Listener>& listenerAddedE
 void Audio::receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent) {
 	auto sound = soundAddedEvent.component;
 
-	// load sound file (testing)
-	std::string soundFile = formatPath(_path, sound->soundFile);
+	// Check if sound already loaded, otherwise load
+	std::string filePath = formatPath(_path, sound->soundFile);
 
-	AudioDecoder* audioDecoder = new AudioDecoder(soundFile);
+	nqr::AudioData* audioData;
 
-	if (audioDecoder->open() != 0) {
-		delete audioDecoder;
-		std::cerr << "Audio AudioDecoder: couldn't load " << soundFile << std::endl;
+	auto i = _loadedSounds.find(filePath);
+
+	if (i == _loadedSounds.end()) {
+		audioData = &_loadedSounds[filePath];
+
+		_audioLoader.Load(audioData, filePath);
+
+		if (!audioData->samples.size()) {
+			std::cerr << "Audio NyquistIO: couldn't load " << filePath << std::endl;
+			_loadedSounds.erase(filePath);
+			return;
+		}
+	}
+	else {
+		audioData = &i->second;
+	}
+
+	// Check if mono or stereo
+	if (!audioData->channelCount || audioData->channelCount > 2) {
+		std::cerr << "Audio: 0 or too many channels " << filePath << std::endl;
+		_loadedSounds.erase(filePath);
 		return;
 	}
 
-	if (!audioDecoder->channels() || audioDecoder->channels() > 2) {
-		delete audioDecoder;
-		std::cerr << "Audio AudioDecoder: channel count not supported " << soundFile << std::endl;
-		return;
-	}
-
-	IPLAudioFormat audioFormat = (audioDecoder->channels() == 1 ? _phononMono : _phononStereo);
+	IPLAudioFormat audioFormat = (audioData->channelCount == 1 ? _phononMono : _phononStereo);
 
 	// Doing source context stuff, so lock
 	std::unique_lock<std::mutex> lock(_threadContext.mutex);
@@ -383,7 +411,7 @@ void Audio::receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent) 
 	sourceContext.middleBufferContext.format = _phononStereo;
 	sourceContext.outBufferContext.format = _phononStereo;
 
-	sourceContext.inBuffer.resize(_frameSize * audioDecoder->channels());
+	sourceContext.inBuffer.resize(_frameSize * audioData->channelCount);
 	sourceContext.middleBuffer.resize(_frameSize * 2);
 	sourceContext.outBuffer.resize(_frameSize * 2);
 
@@ -396,9 +424,13 @@ void Audio::receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent) 
 
 	sourceContext.globalPosition = glm::vec3();
 	sourceContext.globalRotation = glm::quat();
-		
-	sourceContext.audioDecoder = audioDecoder;
+
 	sourceContext.soundSettings = sound->settings;
+		
+	//sourceContext.audioDecoder = audioDecoder;
+	//sourceContext.dataView = data->createInstance();
+	//sourceContext.dataView->mChannels = channels;
+	sourceContext.audioData = audioData;
 }
 
 void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent){
@@ -422,20 +454,28 @@ void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent
 	sourceContext.binauralObjectEffect = nullptr;
 	sourceContext.directSoundEffect = nullptr;
 
-	// Delete for now (need to implment shared audio data!!!)
-	delete sourceContext.audioDecoder;
-	sourceContext.audioDecoder = nullptr;
+	sourceContext.audioData = nullptr;
+
+	sourceContext.currentSample = 0;
 
 	_threadContext.freeSourceContexts.push_back(sound->sourceContextIndex);
 }
 
 void Audio::receive(const CollidingEvent & collidingEvent){
-	//if (collidingEvent.colliding)
-	//	std::cout << "Colliding!\n";
-	//else
-	//	std::cout << "Not colliding...\n";
+	if (!collidingEvent.contactEvent.firstEntity.has_component<Sound>() &&
+		!collidingEvent.contactEvent.secondEntity.has_component<Sound>())
+		return;
+
+	if (collidingEvent.colliding)
+		std::cout << "Colliding!\n";
+	else
+		std::cout << "Not colliding...\n";
 }
 
 void Audio::receive(const ContactEvent & contactEvent){
-	//std::cout << "Contact!\n";
+	if (!contactEvent.firstEntity.has_component<Sound>() &&
+		!contactEvent.secondEntity.has_component<Sound>())
+		return;
+
+	std::cout << "Contact!\n";
 }

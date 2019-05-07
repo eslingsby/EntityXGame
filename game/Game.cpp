@@ -24,28 +24,27 @@
 
 /*
 To-do:
+- Audio properties (loop, volume, seek, etc)
 - Audio for physics events
-- Audio file sharing
-
-- Maybe model should contain GlLoader* and collider contain btRigidBodyWorld* ???
 
 - Fix bullet scaling coordinates
 - Fix colliders as children
 - Dynamic collision shape scaling / changing weight / properties
 
-- Make sound loading threaded / job based
-- Make mesh and texture loading threaded / job based
+- Fix hover and keyboard input in imgui
 
+Less important:
 - Split into Engine.hpp (systems setup and integration) and Game.hpp (entity creation and testing stuff)
 
-- Raycasting from view / moving axis object / Focus on click 
-- Fix hover and keyboard input in imgui
+- Raycasting from view / moving axis object / Focus on click
 - Imgui more component fields / Scene entity table
 
-- Transform functions relative to parent
+- Transform functions properly relative to parent
 - Find by name, find in child, root / destroying children / removing parents
 
 - Incoming events. I.e. build lightmap event / buffer debug lines event
+- Make sound, mesh, texture loading threaded / job based
+- Model have contain GlLoader* and collider contain btRigidBodyWorld* ???
 */
 
 Game::Game(int argc, char** argv){
@@ -84,6 +83,7 @@ Game::Game(int argc, char** argv){
 
 	Audio::ConstructorInfo audioInfo;
 	audioInfo.sampleRate = 48000;
+	//audioInfo.sampleRate = 44100;
 	audioInfo.frameSize = 512;
 	audioInfo.path = dataPath.string();
 
@@ -157,9 +157,10 @@ Game::Game(int argc, char** argv){
 	};
 
 	std::vector<SoundInfo> soundInfos = {
-		{ "sounds/rain.wav", 100000.f, 4 },
-		{ "sounds/thunder.wav", 50000.f, 4 },
-		{ "sounds/crows.wav", 50000.f, 4 }
+		{ "sounds/rain.wav", 80000.f, 4 },
+		{ "sounds/thunder.wav", 80000.f, 4 },
+		{ "sounds/crows.wav", 80000.f, 4 },
+		{ "Ghost.mp3", 80000.f, 8 }
 	};
 
 	float radius = 5000.f;
@@ -178,7 +179,10 @@ Game::Game(int argc, char** argv){
 
 		sound.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
 
-		sound.assign<Sound>(soundInfos[i].soundFile, Sound::Settings{ soundInfos[i].radius, soundInfos[i].falloffPower });
+		Sound::Settings settings{ soundInfos[i].radius, soundInfos[i].falloffPower };
+		//settings.loop = false;
+
+		sound.assign<Sound>(soundInfos[i].soundFile, settings);
 
 		sound.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 100, 100, 100 });
 
@@ -275,7 +279,8 @@ Game::Game(int argc, char** argv){
 		transform->position = { 0.f, 0.f, 0.f };
 		transform->scale = { 1000000, 1000000, 1000000 };
 
-		plane.assign<Model>(Model::FilePaths{ "shapes/plane.obj", 0, "checker.png" });
+		auto model = plane.assign<Model>(Model::FilePaths{ "shapes/plane.obj", 0, "grass.png" });
+		model->textureScale = { 400, 400 };
 
 		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane });
 	}
@@ -368,28 +373,31 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 			bodyInfo.mass = 10;
 			collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Cylinder, 100, 50, 50 }, bodyInfo);
 
-			switch (rand() % 4) {
+			switch (rand() % 3) {
 			case 0:
-				testent.assign<Sound>("sounds/rain.wav", Sound::Settings{ 100000, 10 });
+				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
 				return;
 			case 1:
-				testent.assign<Sound>("sounds/crows.wav", Sound::Settings{ 100000, 10 });
+				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
 				return;
 			case 2:
-				testent.assign<Sound>("sounds/thunder.wav", Sound::Settings{ 100000, 10 });
+				testent.assign<Sound>("HallAndOates.mp3", Sound::Settings{ 50000, 32 });
 				return;
 			}
 
 			return;
 
 		case 2:
+			testent.destroy();
+			_sandbox.pop_back();
 			return;
 
 		case 3:
+			testent.destroy();
+			_sandbox.pop_back();
 			return;
 		}
 	}
-
 
 	switch (mousePressEvent.button) {
 	case 1: 
