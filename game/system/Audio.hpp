@@ -69,6 +69,7 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 	};
 
 	struct ThreadContext {
+		uint32_t sampleRate;
 		uint32_t frameSize;
 
 		IPLhandle phononEnvironment = nullptr;

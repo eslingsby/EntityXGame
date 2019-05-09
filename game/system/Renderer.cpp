@@ -22,7 +22,7 @@ Renderer::Renderer(const ConstructorInfo& constructorInfo) :
 	assert(constructorInfo.mainFragmentShader != "");
 
 	// configure OpenGL
-	glDebugMessageCallback(errorCallback, nullptr);
+	glDebugMessageCallback((GLDEBUGPROC)errorCallback, nullptr);
 
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);

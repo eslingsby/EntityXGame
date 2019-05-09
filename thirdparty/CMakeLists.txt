@@ -50,6 +50,8 @@ target_include_directories("SDL2main" PUBLIC
 	"$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/SDL2-2.0.8/include>"
 )
 
+target_compile_definitions("SDL2-static" PUBLIC "HAVE_LIBC")
+
 set_target_properties("SDL2" PROPERTIES FOLDER "Thirdparty")
 set_target_properties("SDL2-static" PROPERTIES FOLDER "Thirdparty")
 set_target_properties("SDL2main" PROPERTIES FOLDER "Thirdparty")

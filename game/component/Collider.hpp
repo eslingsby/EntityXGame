@@ -50,9 +50,9 @@ struct Collider : public btMotionState {
 	enum BodyType {
 		Solid,
 		Trigger,
-		//Static,
-		//StaticTrigger,
-		//Kinematic,
+		Static,
+		StaticTrigger,
+		Kinematic
 	};
 
 	struct ShapeInfo {
@@ -79,8 +79,13 @@ struct Collider : public btMotionState {
 
 		glm::vec3 centerOfMass;
 
+		float defaultRollingFriction = 0.5f;
+		float defaultSpinningFriction = 0.5f;
 		float defaultFriction = 0.5f;
 		float defaultRestitution = 0.5f;
+
+		float defaultAngularDamping = 0.5f;
+		float defaultLinearDamping = 0.5f;
 
 		//bool overrideGravity = false;
 		//glm::vec3 defaultGravity;
@@ -114,4 +119,10 @@ public:
 	void setFriction(float friction);
 	void setRestitution(float restitution);
 	void setGravity(const glm::vec3& gravity);
+
+	glm::vec3 getLinearVelocity() const;
+	glm::vec3 getAngularVelocity() const;
+
+	void applyForce(const glm::vec3& force);
+	void applyImpulse(const glm::vec3 impulse);
 };

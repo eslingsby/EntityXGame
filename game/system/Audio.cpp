@@ -64,6 +64,20 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 			uint32_t channels = sourceContext.audioData->channelCount;
 			uint32_t samplesAvailable = frameCount * channels;
 			uint32_t audioSampleCount = sourceContext.audioData->samples.size();
+			uint32_t sampleRate = sourceContext.audioData->sampleRate; // when audio is resampled to be the same, use threadContext.sampleRate instead
+
+			if (sourceContext.soundSettings.seeking) {
+				double length = sampleRate / audioSampleCount;
+				
+				if (sourceContext.soundSettings.seek <= 0)
+					sourceContext.currentSample = 0;
+				else if (sourceContext.soundSettings.seek >= length)
+					sourceContext.currentSample = audioSampleCount;
+				else
+					sourceContext.currentSample = sourceContext.soundSettings.seek * sampleRate * channels;
+
+				sourceContext.soundSettings.seeking = false;
+			}
 
 			// Non looping file that's at the end
 			if (sourceContext.currentSample == audioSampleCount)
@@ -174,6 +188,7 @@ Audio::Audio(const ConstructorInfo& constructorInfo) : _sampleRate(constructorIn
 
 	// shared variables
 	_threadContext.frameSize = _frameSize;
+	_threadContext.sampleRate = _sampleRate;
 
 	_phononMono.channelLayoutType = IPL_CHANNELLAYOUTTYPE_SPEAKERS;
 	_phononMono.channelLayout = IPL_CHANNELLAYOUT_MONO;
@@ -335,6 +350,9 @@ void Audio::update(entityx::EntityManager & entities, entityx::EventManager & ev
 		transform->globalDecomposed(&sourceContext.globalPosition, &sourceContext.globalRotation);
 
 		sourceContext.soundSettings = sound->settings;
+
+		if (sound->settings.seeking)
+			sound->settings.seeking = false;
 	}
 }
 
@@ -462,20 +480,32 @@ void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent
 }
 
 void Audio::receive(const CollidingEvent & collidingEvent){
-	if (!collidingEvent.contactEvent.firstEntity.has_component<Sound>() &&
-		!collidingEvent.contactEvent.secondEntity.has_component<Sound>())
-		return;
-
-	if (collidingEvent.colliding)
-		std::cout << "Colliding!\n";
-	else
-		std::cout << "Not colliding...\n";
+	//if (collidingEvent.colliding)
+	//	std::cout << "Colliding!" << std::endl;
+	//else
+	//	std::cout << "Not colliding..." << std::endl;
 }
 
 void Audio::receive(const ContactEvent & contactEvent){
-	if (!contactEvent.firstEntity.has_component<Sound>() &&
-		!contactEvent.secondEntity.has_component<Sound>())
-		return;
+	//std::cout << contactEvent.contactImpulse << std::endl;
 
-	std::cout << "Contact!\n";
+	entityx::Entity soundEntity;
+	
+	// assume that only one entity has sound for now
+	if (contactEvent.firstEntity.has_component<Sound>())
+		soundEntity = contactEvent.firstEntity;
+	else if (contactEvent.secondEntity.has_component<Sound>())
+		soundEntity = contactEvent.secondEntity;
+	else
+		return;
+	
+	if (glm::abs(contactEvent.contactDistance) < 0.4)
+		return;
+	
+	std::cout << contactEvent.contactDistance << std::endl;
+		
+	auto sound = soundEntity.component<Sound>();
+	
+	sound->settings.seeking = true;
+	sound->settings.seek = 0.0;
 }

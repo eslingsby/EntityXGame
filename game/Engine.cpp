@@ -44,9 +44,8 @@ Engine::Engine(int argc, char** argv) {
 	windowInfo.defaultWindow.lockedCursor = false;
 
 	Physics::ConstructorInfo physicsInfo;
-	physicsInfo.defaultGravity = { 0, 0, -9807 };
-	physicsInfo.stepsPerUpdate = 4;
-	physicsInfo.maxSubSteps = 0;
+	physicsInfo.defaultGravity = { 0, 0, -980.7f };
+	physicsInfo.stepsPerUpdate = 1;
 
 	Audio::ConstructorInfo audioInfo;
 	audioInfo.sampleRate = 48000;

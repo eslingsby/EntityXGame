@@ -106,3 +106,19 @@ void Collider::setRestitution(float restitution){
 void Collider::setGravity(const glm::vec3 & gravity){
 	rigidBody.setGravity(toBt(gravity));
 }
+
+glm::vec3 Collider::getLinearVelocity() const{
+	return fromBt(rigidBody.getLinearVelocity());
+}
+
+glm::vec3 Collider::getAngularVelocity() const{
+	return fromBt(rigidBody.getAngularVelocity());
+}
+
+void Collider::applyForce(const glm::vec3 & force){
+	rigidBody.applyCentralForce(toBt(force));
+}
+
+void Collider::applyImpulse(const glm::vec3 impulse){
+	rigidBody.applyCentralImpulse(toBt(impulse));
+}

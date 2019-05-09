@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine.hpp"
+#include "system\PhysicsEvents.hpp"
 
 class Game : public Engine {
 	entityx::Entity _body;
@@ -8,16 +9,12 @@ class Game : public Engine {
 
 	glm::vec3 _spawnLocation;
 
-	bool _wasHovering = false;
-
-	bool _rDown = false;
-	bool _tDown = false;
-
+	std::vector<entityx::Entity> _spinners;
 	std::vector<entityx::Entity> _sandbox;
-	std::vector<entityx::Entity> _sounds;
 public:
 	Game(int argc, char** argv);
 
+	void receive(const PhysicsUpdateEvent& physicsEvent);
 	void receive(const MousePressEvent& mousePressEvent) final;
 	void receive(const KeyInputEvent& keyInputEvent) final;
 

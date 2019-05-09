@@ -8,16 +8,17 @@ struct ContactEvent {
 	entityx::Entity firstEntity;
 	entityx::Entity secondEntity;
 
-	//glm::vec3 globalContactPosition;
-	//glm::vec3 globalContactNormal;
-	//float contactDistance = 0.f;
-	//float contactImpulse = 0.f;
+	glm::vec3 globalContactPosition;
+	glm::vec3 globalContactNormal;
+	float contactDistance = 0.f;
+	float contactImpulse = 0.f;
 };
 
 struct CollidingEvent {
-	bool colliding;
+	entityx::Entity firstEntity;
+	entityx::Entity secondEntity;
 
-	ContactEvent contactEvent;
+	bool colliding;
 };
 
 struct PhysicsUpdateEvent {

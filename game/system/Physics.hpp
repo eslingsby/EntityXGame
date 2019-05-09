@@ -8,6 +8,11 @@
 
 #include <btBulletDynamicsCommon.h>
 
+#include <Bullet3Dynamics/b3CpuRigidBodyPipeline.h>
+
+#include "BulletDynamics/Dynamics/btSimpleDynamicsWorld.h"
+#include "BulletDynamics/Dynamics/btRigidBody.h"
+
 class Physics : public entityx::System<Physics>, public entityx::Receiver<Physics> {
 	btDefaultCollisionConfiguration _collisionConfiguration;
 	btCollisionDispatcher _dispatcher;
@@ -21,7 +26,6 @@ public:
 	struct ConstructorInfo {
 		glm::vec3 defaultGravity = { 0.f, 0.f, -1000.f };
 		uint32_t stepsPerUpdate = 1;
-		uint32_t maxSubSteps = 1;
 	};
 
 private:

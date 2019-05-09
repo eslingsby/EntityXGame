@@ -1,10 +1,13 @@
 #include <btBulletCollisionCommon.h>
 #include <BulletCollision\NarrowPhaseCollision\btRaycastCallback.h>
+#include <BulletDynamics\Dynamics\btRigidBody.h>
 
 #include "component\Transform.hpp"
 
 #include "system\Physics.hpp"
 #include "system\PhysicsEvents.hpp"
+
+//#include <Newton.h>
 
 entityx::EventManager* eventsPtr;
 
@@ -15,7 +18,7 @@ void contactStartedCallback(btPersistentManifold* const& manifold) {
 	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
 		return;
 
-	eventsPtr->emit<CollidingEvent>(CollidingEvent{ true, ContactEvent{ firstCollider->self, secondCollider->self } });
+	eventsPtr->emit<CollidingEvent>(CollidingEvent{ firstCollider->self, secondCollider->self, true });
 }
 
 void contactEndedCallback(btPersistentManifold* const& manifold) {
@@ -25,7 +28,7 @@ void contactEndedCallback(btPersistentManifold* const& manifold) {
 	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
 		return;
 
-	eventsPtr->emit<CollidingEvent>(CollidingEvent{ false, ContactEvent{ firstCollider->self, secondCollider->self } });
+	eventsPtr->emit<CollidingEvent>(CollidingEvent{ firstCollider->self, secondCollider->self, false });
 }
 
 bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
@@ -34,9 +37,17 @@ bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* c
 
 	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
 		return false;
+	
+	ContactEvent contactEvent{ firstCollider->self, secondCollider->self };
 
-	eventsPtr->emit<ContactEvent>(ContactEvent{ firstCollider->self, secondCollider->self });
+	contactEvent.contactImpulse = cp.getAppliedImpulse();
+	contactEvent.contactDistance = cp.getDistance();
 
+	contactEvent.globalContactPosition = fromBt(cp.m_positionWorldOnB);
+	contactEvent.globalContactNormal = fromBt(cp.m_normalWorldOnB);
+	
+	eventsPtr->emit<ContactEvent>(contactEvent);
+	
 	return false;
 }
 
@@ -63,51 +74,57 @@ void Physics::configure(entityx::EventManager & events){
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
 	// Copy over transform data to collider
-	for (auto entity : entities.entities_with_components<Transform, Collider>()) {
-		auto transform = entity.component<Transform>();
-		auto collider = entity.component<Collider>();
-		
-		// If position / rotation changed
-		glm::vec3 globalPosition;
-		glm::quat globalRotation;
-		glm::vec3 globalScale;
+	//for (auto entity : entities.entities_with_components<Transform, Collider>()) {
+	//	auto transform = entity.component<Transform>();
+	//	auto collider = entity.component<Collider>();
+	//	
+	//	// If position / rotation changed
+	//	glm::vec3 globalPosition;
+	//	glm::quat globalRotation;
+	//	glm::vec3 globalScale;
+	//
+	//	transform->globalDecomposed(&globalPosition, &globalRotation, &globalScale);
+	//	
+	//	btTransform newTransform;
+	//
+	//	newTransform.setOrigin(toBt(globalPosition));
+	//	newTransform.setRotation(toBt(globalRotation));
+	//
+	//	collider->rigidBody.setWorldTransform(newTransform);
+	//
+	//	// If scale, mass, or center of mass changed
+	//	btCollisionShape* collisionShape;
+	//
+	//	std::visit([&](btCollisionShape& shape) {
+	//		collisionShape = &shape;
+	//	}, collider->shapeVariant);
+	//
+	//	if (fromBt(collisionShape->getLocalScaling()) != globalScale) {
+	//		_dynamicsWorld.removeRigidBody(&collider->rigidBody);
+	//
+	//		collisionShape->setLocalScaling(toBt(globalScale));
+	//
+	//		btVector3 inertia;
+	//		collisionShape->calculateLocalInertia(collider->bodyInfo.mass, inertia);
+	//
+	//		collider->rigidBody.setMassProps(collider->bodyInfo.mass, inertia);
+	//
+	//		_dynamicsWorld.addRigidBody(&collider->rigidBody);
+	//	}
+	//}
 
-		transform->globalDecomposed(&globalPosition, &globalRotation, &globalScale);
-		
-		btTransform newTransform;
-
-		newTransform.setOrigin(toBt(globalPosition));
-		newTransform.setRotation(toBt(globalRotation));
-
-		collider->rigidBody.setWorldTransform(newTransform);
-
-		// If scale, mass, or center of mass changed
-		btCollisionShape* collisionShape;
-
-		std::visit([&](btCollisionShape& shape) {
-			collisionShape = &shape;
-		}, collider->shapeVariant);
-
-		if (fromBt(collisionShape->getLocalScaling()) != globalScale) {
-			_dynamicsWorld.removeRigidBody(&collider->rigidBody);
-
-			collisionShape->setLocalScaling(toBt(globalScale));
-
-			btVector3 inertia;
-			collisionShape->calculateLocalInertia(collider->bodyInfo.mass, inertia);
-
-			collider->rigidBody.setMassProps(collider->bodyInfo.mass, inertia);
-
-			_dynamicsWorld.addRigidBody(&collider->rigidBody);
-		}
-	}
+	//_dynamicsWorld.setSynchronizeAllMotionStates(true);
 
 	// Step the simulation, pumping collision events each step
-	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++) {
-		_dynamicsWorld.stepSimulation((btScalar)(dt) / _constructorInfo.stepsPerUpdate, _constructorInfo.maxSubSteps);
+	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++){
 
-		events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
+		//_dynamicsWorld.synchronizeMotionStates();
+
+		_dynamicsWorld.stepSimulation(dt / _constructorInfo.stepsPerUpdate, 0);
+
+		//events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
 	}
+
 
 	// Draw bullet world
 	_debugger.clearLines();
@@ -165,17 +182,40 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 	if (collider->bodyInfo.mass != 0.f)
 		shape->calculateLocalInertia(collider->bodyInfo.mass, localInertia);
 
-	collider->rigidBody = btRigidBody(collider->bodyInfo.mass, (btMotionState*)collider.get(), shape, localInertia);
+	btRigidBody::btRigidBodyConstructionInfo rigidBodyInfo(collider->bodyInfo.mass, (btMotionState*)collider.get(), shape, localInertia);
+	
+	//rigidBodyInfo.m_linearSleepingThreshold = 0;
+	//rigidBodyInfo.m_angularSleepingThreshold = 0;
+
+	rigidBodyInfo.m_friction = collider->bodyInfo.defaultFriction;
+	rigidBodyInfo.m_rollingFriction = collider->bodyInfo.defaultRollingFriction;
+	rigidBodyInfo.m_spinningFriction = collider->bodyInfo.defaultSpinningFriction;
+
+	rigidBodyInfo.m_linearDamping = collider->bodyInfo.defaultLinearDamping;
+	rigidBodyInfo.m_angularDamping = collider->bodyInfo.defaultAngularDamping;
+
+	rigidBodyInfo.m_restitution = collider->bodyInfo.defaultRestitution;
+
+	collider->rigidBody = btRigidBody(rigidBodyInfo);
 	collider->rigidBody.setUserPointer(collider.get());
 
-	if (collider->bodyInfo.type == Collider::Trigger)
+	switch (collider->bodyInfo.type) {
+	case Collider::Trigger:
 		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE);
+		break;
+	case Collider::StaticTrigger:
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_NO_CONTACT_RESPONSE | btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
+		break;
+	case Collider::Static:
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_STATIC_OBJECT);
+		break;
+	case Collider::Kinematic:
+		collider->rigidBody.setCollisionFlags(btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
+		break;
+	}
 
 	collider->setAngularFactor(collider->bodyInfo.defaultAngularFactor);
 	collider->setLinearFactor(collider->bodyInfo.defaultLinearFactor);
-	collider->setFriction(collider->bodyInfo.defaultFriction);
-	collider->setRestitution(collider->bodyInfo.defaultRestitution);
-
 	collider->setAngularVelocity(collider->bodyInfo.startingAngularVelocity);
 	collider->setLinearVelocity(collider->bodyInfo.startingLinearVelocity);
 

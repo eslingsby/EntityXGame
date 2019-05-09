@@ -3,6 +3,14 @@
 #include "component\Transform.hpp"
 #include "component\Collider.hpp"
 
+Controller::Controller(const ConstructorInfo & constructorInfo) :
+	_enabled(constructorInfo.defaultEnabled), 
+	_walkSpeed(constructorInfo.defaultWalkSpeed),
+	_runSpeed(constructorInfo.defaultRunSpeed),
+	_jumpMagnitude(constructorInfo.defaultJumpMagnitude),
+	_mouseSensisitivity(constructorInfo.defaultMouseSensisitivity){
+}
+
 void Controller::configure(entityx::EventManager &events){
 	events.subscribe<CursorEnterEvent>(*this);
 	events.subscribe<CursorPositionEvent>(*this);
@@ -16,7 +24,8 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	if (!_head.valid() ||
 		!_head.has_component<Transform>() ||
 		!_body.valid() || 
-		!_body.has_component<Transform>())
+		!_body.has_component<Transform>() ||
+		!_body.has_component<Collider>())
 		return;
 
 	if (!_enabled)
@@ -28,28 +37,52 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	if (headTransform->parent != _body)
 		return;
 		
-	bodyTransform->globalRotate(glm::quat({ 0.0, 0.0, -_mousePos.x * dt }));
 
 	_xAngle -= _mousePos.y * dt;
 	_xAngle = glm::clamp(_xAngle, -glm::half_pi<float>(), glm::half_pi<float>());
 	
 	headTransform->rotation = glm::quat(glm::vec3{ _xAngle, 0, 0 });
 	
-	float moveSpeed = 2000.f * dt;
+	float moveSpeed = _walkSpeed;
 	
 	if (_boost)
-		moveSpeed *= 2;	
+		moveSpeed = _runSpeed;
 
-	//bodyTransform->localTranslate(Transform::forward * _flash * 100.f);
+	glm::quat globalRotation;
+	bodyTransform->globalDecomposed(nullptr, &globalRotation);
+
+	glm::vec3 translation;
 	
 	if (_forward)
-		bodyTransform->localTranslate(Transform::forward * (float)moveSpeed);
+		translation += Transform::forward;
 	if (_back)
-		bodyTransform->localTranslate(Transform::back * (float)moveSpeed);
+		translation += Transform::back;
 	if (_left)
-		bodyTransform->localTranslate(Transform::left * (float)moveSpeed);
+		translation += Transform::left;
 	if (_right)
-		bodyTransform->localTranslate(Transform::right * (float)moveSpeed);
+		translation += Transform::right;
+
+	if (translation != glm::vec3{ 0,0,0 })
+		translation = globalRotation * glm::normalize(translation) * moveSpeed * (float)dt;
+
+	if (_touchingCount)
+		translation = glm::mix(_lastTranslation, translation, dt * 10);
+	else
+		translation = glm::mix(_lastTranslation, translation, dt * 1);
+
+	//bodyTransform->globalTranslate(translation);
+
+	// super hacky character controller
+	auto collider = _body.component<Collider>();
+
+	glm::vec3 velocity = collider->getLinearVelocity();
+
+	collider->setLinearVelocity((translation / (float)dt) + (velocity - _lastTranslation * 0.985f / (float)dt));
+
+	collider->setAngularVelocity(glm::vec3{ 0.f, 0.f, -_mousePos.x });
+
+
+	_lastTranslation = translation;
 
 	//_flash = 0;
 	_mousePos = { 0.0, 0.0 };
@@ -57,21 +90,25 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	if (!_touchingCount)
 		return;
 
-	if (!_body.has_component<Collider>()) {
-		if (_up)
-			bodyTransform->localTranslate(Transform::up * (float)moveSpeed);
-		if (_down)
-			bodyTransform->localTranslate(Transform::down * (float)moveSpeed);
+	if (_down && !_crouched) {
+		bodyTransform->scale.z *= 0.5;
+		bodyTransform->position.z -= 35;
 
-		return;
+		_crouched = true;
 	}
+	else if (!_down && _crouched){
+		bodyTransform->scale.z *= 2;
+		bodyTransform->position.z += 35;
+
+		_crouched = false;
+	}
+
 
 	if (_up) {
 		if (!_jumped) {
 			_jumped = true;
 
-			auto collider = _body.component<Collider>();
-			collider->setLinearVelocity({ 0, 0, 4000 });
+			collider->applyImpulse(Transform::up * _jumpMagnitude);
 		}
 	}
 	else if (!_up && _jumped) {
@@ -131,7 +168,7 @@ void Controller::receive(const ScrollWheelEvent& scrollWheelEvent){
 }
 
 void Controller::receive(const CollidingEvent& collidingEvent){
-	if (collidingEvent.contactEvent.firstEntity == _body || collidingEvent.contactEvent.secondEntity == _body) {
+	if (collidingEvent.firstEntity == _body || collidingEvent.secondEntity == _body) {
 		if (collidingEvent.colliding)
 			_touchingCount++;
 		else

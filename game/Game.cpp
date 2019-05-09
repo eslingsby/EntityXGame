@@ -14,7 +14,7 @@
 #include "system\Interface.hpp"
 #include "system\Lightmaps.hpp"
 
-#include <glm\gtx\quaternion.hpp>
+#include "other\GlmPrint.hpp"
 
 /*
 To-do:
@@ -40,8 +40,10 @@ Less important:
 */
 
 Game::Game(int argc, char** argv) : Engine(argc, argv){
+	events.subscribe<PhysicsUpdateEvent>(*this);
+
 	// Setup Test entities
-	_spawnLocation = { 0, -5000, 0 };
+	_spawnLocation = { 0, -1000, 90 };
 	
 	// Camera (body has collider, head has camera. Head is child of body)
 	{	
@@ -50,29 +52,31 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 
 		auto bodyTransform = _body.assign<Transform>();
 		bodyTransform->position = _spawnLocation;
-		//bodyTransform->scale = { 500.f, 500.f, 1000.f };
 
 		Collider::BodyInfo bodyInfo;
-		bodyInfo.mass = 10;
+		bodyInfo.type = Collider::Solid;
+		bodyInfo.mass = 62; //kg
 		bodyInfo.alwaysActive = true;
 		bodyInfo.callbacks = true;
-		//bodyInfo.defaultLinearFactor = { 0, 0, 0 };
-		bodyInfo.defaultAngularFactor = { 0, 0, 0 };
+		bodyInfo.defaultAngularFactor = { 0, 0, 1 };
+		//bodyInfo.defaultLinearFactor = { 0, 0, 1 };
+		//bodyInfo.defaultLinearDamping = 0.9;
+		//bodyInfo.defaultAngularDamping = 0.9;
+		bodyInfo.defaultRestitution = 0;
+		bodyInfo.defaultFriction = 1;
 
-		auto bodyCollider = _body.assign<Collider>(Collider::ShapeInfo{ Collider::Capsule, 600.f, 600.f }, bodyInfo);
-
-		//auto bodyModel = _body.assign<Model>(Model::FilePaths{ "cube.obj", 0, "rgb.png" });
-
+		auto bodyCollider = _body.assign<Collider>(Collider::ShapeInfo{ Collider::Capsule, 80, 150 }, bodyInfo);
+			
 		// Head (x axis rotation)
 		_head = entities.create();
 
 		auto headTransform = _head.assign<Transform>();
 		headTransform->parent = _body;
-		headTransform->position = { 0.f, 0.f, 300.f };
+		headTransform->position = { 0.f, 0.f, 150.f / 2.f };
 
 		auto headCamera = _head.assign<Camera>();
 		headCamera->verticalFov = 90.f;
-		headCamera->zDepth = 4000000.f;
+		headCamera->zDepth = 500000.f;
 		headCamera->offsetRotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
 
 		_head.assign<Listener>();
@@ -80,145 +84,23 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		// Set as controlled (enabled on focus event)
 		systems.system<Controller>()->setControlled(_head, _body);
 		systems.system<Controller>()->setEnabled(false);
-
-		// Set as focused UI entity
-		systems.system<Interface>()->setFocusedEntity(_body);
 	}
-
-	// Testing sounds
-	struct SoundInfo {
-		std::string soundFile;
-		float radius;
-		uint32_t falloffPower;
-	};
-
-	std::vector<SoundInfo> soundInfos = {
-		{ "sounds/rain.wav", 80000.f, 4 },
-		{ "sounds/thunder.wav", 80000.f, 4 },
-		{ "sounds/crows.wav", 80000.f, 4 },
-		//{ "Ghost.mp3", 80000.f, 8 }
-	};
-
-	float radius = 5000.f;
-
-	uint32_t count = soundInfos.size();
-	float stepDegrees = 360.f / count;
-
-	for (uint32_t i = 0; i < count; i++) {		
-		entityx::Entity sound = entities.create();
-
-		auto transform = sound.assign<Transform>();
-		transform->scale = { 2, 2, 2 };
-		transform->rotation = glm::quat({ glm::radians(90.f + 45.f), 0, glm::radians(stepDegrees * i) });
-		transform->position = glm::toMat4(glm::quat({ 0, 0, glm::radians(stepDegrees * i) })) * glm::vec4(Transform::forward * radius, 1);
-		transform->position.z = 2000.f;
-
-		sound.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
-
-		Sound::Settings settings{ soundInfos[i].radius, soundInfos[i].falloffPower };
-		//settings.loop = false;
-
-		sound.assign<Sound>(soundInfos[i].soundFile, settings);
-
-		sound.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 100, 100, 100 });
-
-		_sounds.push_back(sound);
-	}
-
-	// Axis (with collider for each axis)
-	{
-		// Axis root
-		entityx::Entity axis = entities.create();
-
-		auto axisTransform = axis.assign<Transform>();
-		axisTransform->position = { 0, 0, 1000 };
-		axisTransform->scale = { 5, 5, 5 };
-	
-		// Axis visual
-		entityx::Entity axisVisual = entities.create();
-		
-		auto axisVisualTransform = axisVisual.assign<Transform>();
-		axisVisualTransform->parent = axis;
-		axisVisualTransform->scale = { 50, 50, 50 };
-	
-		axisVisual.assign<Model>(Model::FilePaths{ "axis.obj", 0, "rgb.png" });
-
-		// Shared variables
-		glm::vec3 colliderScale = { 50, 50, 475 };
-
-		Collider::ShapeInfo shapeInfo;
-		shapeInfo.type = Collider::Cylinder;
-
-		// X collider
-		entityx::Entity xAxis = entities.create();
-
-		auto xTransform = xAxis.assign<Transform>();
-		xTransform->parent = axis;
-		xTransform->rotation = glm::quat(glm::radians(glm::vec3{ 0.f, 90.f, 0.f }));
-		xTransform->scale = colliderScale;
-		xTransform->position = { colliderScale.z / 2, 0, 0 };
-
-		//xAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
-		xAxis.assign<Collider>(shapeInfo);
-
-		// Y collider
-		entityx::Entity yAxis = entities.create();
-		
-		auto yTransform = yAxis.assign<Transform>();
-		yTransform->parent = axis;
-		yTransform->position = { 0, colliderScale.z / 2, 0 };
-		yTransform->scale = colliderScale;
-		yTransform->rotation = glm::quat(glm::radians(glm::vec3{ 90.f, 0.f, 0.f }));
-		
-		//yAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
-		yAxis.assign<Collider>(shapeInfo);
-		
-		// Z collider
-		entityx::Entity zAxis = entities.create();
-		
-		auto zTransform = zAxis.assign<Transform>();
-		zTransform->parent = axis;
-		zTransform->position = { 0, 0, colliderScale.z / 2 };
-		zTransform->scale = colliderScale;
-		
-		//zAxis.assign<Model>(Model::FilePaths{ "shapes/cylinder.obj", 0, "rgb.png" });
-		zAxis.assign<Collider>(shapeInfo);
-	}
-
-	// Testing ball (child of head)
-	//{
-	//	entityx::Entity ball = entities.create();
-	//
-	//	ball.assign<Name>("test");
-	//
-	//	auto transform = ball.assign<Transform>();
-	//	transform->parent = _head;
-	//	transform->position = { 0.f, 1000.f, 0.f };
-	//	transform->scale = { 100, 100, 100 };
-	//
-	//	ball.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "rgb.png" });
-	//
-	//	Collider::BodyInfo bodyInfo;
-	//	bodyInfo.type = Collider::Trigger;
-	//	//bodyInfo.mass = 10;
-	//	bodyInfo.alwaysActive = true;
-	//	bodyInfo.callbacks = true;
-	//
-	//	ball.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
-	//}
 
 	// Floor
 	{
 		entityx::Entity plane = entities.create();
 
 		auto transform = plane.assign<Transform>();
-		transform->position = { 0.f, 0.f, 0.f };
-		transform->scale = { 1000000, 1000000, 1000000 };
+		transform->scale *= 50000;
 
 		auto model = plane.assign<Model>(Model::FilePaths{ "shapes/plane.obj", 0, "grass.png" });
-		model->textureScale = { 400, 400 };
+		model->textureScale *= 100;
 
-		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane });
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.type = Collider::Static;
+		bodyInfo.defaultRestitution = 1;
+
+		auto collider = plane.assign<Collider>(Collider::ShapeInfo{ Collider::Plane }, bodyInfo);
 	}
 
 	// Skybox
@@ -226,7 +108,7 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		entityx::Entity skybox = entities.create();
 
 		auto transform = skybox.assign<Transform>();
-		transform->scale = { 50000, 50000, 50000 };
+		transform->scale *= 5000;
 
 		skybox.assign<Model>(Model::FilePaths{ "skybox.obj", 0, "skybox.png" });
 	}
@@ -236,166 +118,139 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		entityx::Entity scene = entities.create();
 	
 		auto transform = scene.assign<Transform>();
-		transform->position = { 0, 10000, 100 };
-		transform->scale = { 5, 5, 5 };
+		transform->position = { 0, 1000, 1 };
+		transform->scale *= 0.8f;
 		transform->rotation = glm::quat({ glm::radians(90.f), 0.f, 0.f });
 	
 		systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
 	}
+
+	// Create platform
+	{
+		entityx::Entity platform = entities.create();
+
+		auto transform = platform.assign<Transform>();
+		transform->position = Transform::left * 1000.f + Transform::up * 100.f;
+		transform->scale = { 100, 100, 10 };
+
+		Collider::ShapeInfo shapeInfo;
+		shapeInfo.type = Collider::Box;
+
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.type = Collider::Kinematic;
+		bodyInfo.defaultRestitution = 1;
+		bodyInfo.defaultFriction = 1;
+		bodyInfo.mass = 10000;
+		bodyInfo.alwaysActive = true;
+
+		platform.assign<Collider>(shapeInfo, bodyInfo);
+
+		platform.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "wood.png" });
+
+		_spinners.push_back(platform);
+	}
+}
+
+void Game::receive(const PhysicsUpdateEvent & physicsEvent){
+
 }
 
 void Game::receive(const MousePressEvent& mousePressEvent){
 	Engine::receive(mousePressEvent);
 
-	// Create a bunch of junk on mouse events (testing)
-	if (mousePressEvent.action != Action::Press)
+	if (mousePressEvent.action != Action::Press|| !_head.valid())
 		return;
 
-	entityx::Entity testent = entities.create();
-	_sandbox.push_back(testent);
+	auto headTransform = _head.component<Transform>();
 
-	systems.system<Interface>()->setFocusedEntity(testent);
+	glm::vec3 globalHeadPosition;
+	glm::quat globalHeadRotation;
 
-	auto cameraTransform = _head.component<Transform>();
+	headTransform->globalDecomposed(&globalHeadPosition, &globalHeadRotation);
 
-	glm::vec3 globalPosition;
-	glm::quat globalRotation;
-	cameraTransform->globalDecomposed(&globalPosition, &globalRotation);
+	glm::vec3 position = globalHeadRotation * Transform::forward * 100.f;
 	
-	auto transform = testent.assign<Transform>();
-	transform->position = globalPosition + globalRotation * Transform::forward * 2500.f;
-	transform->rotation = glm::quat({ 0, 0, glm::eulerAngles(globalRotation).z });
-	
-	entityx::ComponentHandle<Collider> collider;
-	entityx::ComponentHandle<Model> model;
+	switch (mousePressEvent.button) {
+	case 1:
+	{
+		// Tiny little box
+		entityx::Entity testent = entities.create();
 
-	Collider::BodyInfo bodyInfo;
+		auto transform = testent.assign<Transform>();
+		transform->rotation = globalHeadRotation;
+		transform->position = globalHeadPosition + position;
+		transform->scale *= 10;
 
-	if (mousePressEvent.mods & Modifier::Mod_Ctrl) {
-		switch (mousePressEvent.button) {
-		case 1:
-			// right mouse + ctrl (speaker)
-			transform->scale *= 2;
-			transform->rotation = glm::quat(glm::radians(glm::vec3{ rand() % 360, rand() % 360, rand() % 360 }));
+		Collider::ShapeInfo shapeInfo;
+		shapeInfo.type = Collider::Box;
 
-			model = testent.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.type = Collider::Solid;
+		//bodyInfo.defaultRestitution = 0;
+		bodyInfo.defaultFriction = 1;
+		bodyInfo.mass = 1;
 
-			bodyInfo.mass = 10;
-			collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Cylinder, 100, 50, 50 }, bodyInfo);
+		testent.assign<Collider>(shapeInfo, bodyInfo);
 
-			switch (rand() % 3) {
-			case 0:
-				testent.assign<Sound>("sounds/crows.wav", Sound::Settings{ 50000, 32 });
-				return;
-			case 1:
-				testent.assign<Sound>("sounds/rain.wav", Sound::Settings{ 50000, 32 });
-				return;
-			case 2:
-				testent.assign<Sound>("sounds/thunder.wav", Sound::Settings{ 50000, 32 });
-				return;
-			}
+		testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "rgb.png" });
 
-			return;
-
-		case 2:
-			testent.destroy();
-			_sandbox.pop_back();
-			return;
-
-		case 3:
-			testent.destroy();
-			_sandbox.pop_back();
-			return;
-		}
+		_sandbox.push_back(testent);
 	}
 
-	switch (mousePressEvent.button) {
-	case 1: 
-		// left mouse (heavy weight)
-		transform->scale = { 1000.f, 1000.f, 1000.f };
-		model = testent.assign<Model>(Model::FilePaths{ "anvil.obj", 0, "anvil.png" });
+		break;
 
-		bodyInfo.mass = 10000;
+	case 3:
+	{
+		// Beachball
+		entityx::Entity testent = entities.create();
+
+		auto transform = testent.assign<Transform>();
+		transform->rotation = globalHeadRotation;
+		transform->position = globalHeadPosition + position;
+		transform->scale *= 64;
+
+		Collider::ShapeInfo shapeInfo;
+		shapeInfo.type = Collider::Sphere;
+
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.type = Collider::Solid;
+		bodyInfo.defaultRestitution = 1;
 		bodyInfo.defaultFriction = 1;
-		bodyInfo.defaultRestitution = 0;
-		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5f, 1.5f, 1.5f }, bodyInfo);
-
-		return;
-
-	case 2: 
-		// middle mouse (bouncy ball)
-		transform->scale = { 500.f, 500.f, 500.f };
-		transform->rotation = glm::quat({ 0, 0, glm::radians((float)(rand() % 360)) });
-		model = testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
-
-		bodyInfo.mass = 5;
-		bodyInfo.defaultRestitution = 1.f;
-		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Sphere }, bodyInfo);
-
-		return;
-
-	case 3: 
-		// right mouse (light pizza box)
-		transform->scale = { 700.f, 700.f, 100.f };
-		model = testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "pizza.png" });
-
+		bodyInfo.defaultRollingFriction = 1;
+		bodyInfo.defaultSpinningFriction = 1;
+		bodyInfo.defaultLinearDamping = 0.5;
+		bodyInfo.defaultAngularDamping = 0.2;
 		bodyInfo.mass = 1;
-		collider = testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box }, bodyInfo);
+		bodyInfo.callbacks = true;
 
-		return;
+		testent.assign<Collider>(shapeInfo, bodyInfo);
+
+		Sound::Settings soundInfo;
+		soundInfo.loop = false;
+		soundInfo.radius = 10000;
+		soundInfo.falloffPower = 16;
+
+		//testent.assign<Sound>("sounds/ball.wav", soundInfo);
+
+		testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
+
+		_sandbox.push_back(testent);
+	}
+
+		break;
 	}
 }
 
 void Game::receive(const KeyInputEvent& keyInputEvent){
 	Engine::receive(keyInputEvent);
 
-	// Spawn stuff
-	switch (keyInputEvent.key) {
-	case Key_R: 
-		// clean-up
-		if (keyInputEvent.action == Action::Press && !_rDown) {
-		
-			if (keyInputEvent.action != Action::Press)
-				return;
-
-			for (entityx::Entity& entity : _sandbox)
-				entity.destroy();
-
-			_sandbox.clear();
-
-			_rDown = true;
-		}
-		else if (keyInputEvent.action == Action::Release && _rDown) {
-			_rDown = false;
-		}
-
+	if (keyInputEvent.action != Action::Press || keyInputEvent.key != Key::Key_R)
 		return;
 
-	case Key_T:
-		// respawn
-		if (keyInputEvent.action == Action::Press && !_rDown) {
-			if (keyInputEvent.action != Action::Press)
-				return;
+	for (auto entity : _sandbox)
+		entity.destroy();
 
-			if (!_body.valid() || !_body.has_component<Transform>())
-				return;
-
-			_body.component<Transform>()->position = _spawnLocation;
-
-			if (!_body.has_component<Collider>())
-				return;
-
-			_body.component<Collider>()->setAngularVelocity({ 0, 0, 0 });
-			_body.component<Collider>()->setLinearVelocity({ 0, 0, 0 });
-
-			_tDown = true;
-		}
-		else if (keyInputEvent.action == Action::Release && _rDown) {
-			_tDown = false;
-		}
-
-		return;
-	}
+	_sandbox.clear();
 }
 
 void Game::update(double dt){
@@ -405,17 +260,29 @@ void Game::update(double dt){
 	const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
 	systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
 
-	// Spin sounds for fun
-	for (auto entity : _sounds) {
+	// Spin stuff for fun
+	for (auto entity : _spinners) {
 		if (!entity.has_component<Transform>())
 			continue;
 
 		auto transform = entity.component<Transform>();
 
-		glm::mat4 rotation = glm::toMat4(glm::quat({ 0, 0, glm::radians(20 * dt) }));
+		glm::quat rotation = glm::quat({ 0, 0, glm::radians(5 * dt) });
+		
+		glm::vec3 newPosition = rotation * transform->position;
 
-		transform->position = rotation * glm::vec4(transform->position, 1);
+		auto collider = entity.component<Collider>();
 
+		//glm::vec3 velocity = transform->position - newPosition;
+		//collider->setLinearVelocity(velocity);
+
+		//btTransform bulletTransform;
+		//bulletTransform.setOrigin(toBt(newPosition));
+		//bulletTransform.setRotation(toBt(rotation * transform->rotation));
+		//
+		//collider->rigidBody.getMotionState()->setWorldTransform(bulletTransform);
+
+		transform->position = newPosition;
 		transform->globalRotate(rotation);
 	}
 }

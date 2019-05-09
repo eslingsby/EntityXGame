@@ -14,6 +14,7 @@ struct Sound {
 		bool attenuated = true;
 		bool binaural = true;
 
+		bool seeking = false;
 		double seek = 0.0;
 	} settings;
 
