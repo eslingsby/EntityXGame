@@ -3,6 +3,8 @@
 #include "component\Transform.hpp"
 #include "component\Collider.hpp"
 
+#include "other\GlmPrint.hpp"
+
 Controller::Controller(const ConstructorInfo & constructorInfo) :
 	_enabled(constructorInfo.defaultEnabled), 
 	_walkSpeed(constructorInfo.defaultWalkSpeed),
@@ -28,8 +30,26 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 		!_body.has_component<Collider>())
 		return;
 
-	if (!_enabled)
+	if (!_enabled) {
+		auto collider = _body.component<Collider>();
+		
+		glm::vec3 velocity = collider->getLinearVelocity();
+		glm::vec3 translation;
+
+		if (_lastTranslation != glm::vec3())
+			translation = _lastTranslation /  (float)dt;
+
+		if (_touchingCount)
+			translation = glm::mix(translation, glm::vec3(), dt * 10);
+		else
+			translation = glm::mix(translation, glm::vec3(), dt * 1);
+
+		_lastTranslation = translation * (float)dt;
+
+		collider->setLinearVelocity(translation + (velocity * Transform::up));
+		collider->setAngularVelocity(glm::vec3());
 		return;
+	}
 
 	auto headTransform = _head.component<Transform>();
 	auto bodyTransform = _body.component<Transform>();
@@ -37,6 +57,8 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	if (headTransform->parent != _body)
 		return;
 		
+	_mousePos = glm::mix(_mousePos, _dMousePos, 50 * dt);
+	_dMousePos = { 0, 0 };
 
 	_xAngle -= _mousePos.y * dt;
 	_xAngle = glm::clamp(_xAngle, -glm::half_pi<float>(), glm::half_pi<float>());
@@ -70,22 +92,16 @@ void Controller::update(entityx::EntityManager &entities, entityx::EventManager 
 	else
 		translation = glm::mix(_lastTranslation, translation, dt * 1);
 
-	//bodyTransform->globalTranslate(translation);
-
-	// super hacky character controller
+	// character controller (overrides velocity, doesn't ride on platforms)
 	auto collider = _body.component<Collider>();
 
 	glm::vec3 velocity = collider->getLinearVelocity();
 
-	collider->setLinearVelocity((translation / (float)dt) + (velocity - _lastTranslation * 0.985f / (float)dt));
+	collider->setLinearVelocity(translation / (float)dt + velocity * Transform::up);
 
 	collider->setAngularVelocity(glm::vec3{ 0.f, 0.f, -_mousePos.x });
-
-
+	
 	_lastTranslation = translation;
-
-	//_flash = 0;
-	_mousePos = { 0.0, 0.0 };
 		
 	if (!_touchingCount)
 		return;
@@ -121,7 +137,7 @@ void Controller::receive(const CursorEnterEvent& cursorEnterEvent){
 }
 
 void Controller::receive(const CursorPositionEvent& cursorPositionEvent){
-	_mousePos = cursorPositionEvent.relative;
+	_dMousePos = cursorPositionEvent.relative;
 }
 
 void Controller::receive(const KeyInputEvent& keyInputEvent){
@@ -164,7 +180,7 @@ void Controller::receive(const MousePressEvent& mousePressEvent){
 }
 
 void Controller::receive(const ScrollWheelEvent& scrollWheelEvent){
-	_flash = scrollWheelEvent.offset.y;
+
 }
 
 void Controller::receive(const CollidingEvent& collidingEvent){

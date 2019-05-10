@@ -28,8 +28,7 @@ class Controller : public entityx::System<Controller>, public entityx::Receiver<
 	bool _boost = false;
 
 
-	float _flash = 0;
-
+	glm::vec2 _dMousePos;
 	glm::vec2 _mousePos;
 
 	bool _locked = false;

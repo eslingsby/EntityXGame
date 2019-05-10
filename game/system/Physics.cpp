@@ -7,60 +7,102 @@
 #include "system\Physics.hpp"
 #include "system\PhysicsEvents.hpp"
 
-//#include <Newton.h>
-
 entityx::EventManager* eventsPtr;
 
-void contactStartedCallback(btPersistentManifold* const& manifold) {
-	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
-	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+std::vector<btPersistentManifold*> manifolds;
 
-	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
-		return;
-
-	eventsPtr->emit<CollidingEvent>(CollidingEvent{ firstCollider->self, secondCollider->self, true });
+inline void readConctactPoint(const btManifoldPoint& from, ContactEvent::Contact* to) {
+	to->contactImpulse = from.getAppliedImpulse();
+	to->contactDistance = from.getDistance();
+	to->globalContactPosition = fromBt(from.m_positionWorldOnB);
+	to->globalContactNormal = fromBt(from.m_normalWorldOnB);
 }
 
-void contactEndedCallback(btPersistentManifold* const& manifold) {
-	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
-	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+inline float readManifold(const btPersistentManifold* const& from, ContactEvent* to) {
+	float combinedImpulse = 0;
+	to->contactCount = from->getNumContacts();
 
-	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
-		return;
+	for (uint8_t i = 0; i < to->contactCount; i++) {
+		readConctactPoint(from->getContactPoint(i), &to->contacts[i]);
+		combinedImpulse += to->contacts[i].contactImpulse;
+	}
 
-	eventsPtr->emit<CollidingEvent>(CollidingEvent{ firstCollider->self, secondCollider->self, false });
+	return combinedImpulse;
 }
 
-bool contactAddedCallback(btManifoldPoint& cp, const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0, const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
-	Collider* firstCollider = (Collider*)colObj0Wrap->getCollisionObject()->getUserPointer();
-	Collider* secondCollider = (Collider*)colObj1Wrap->getCollisionObject()->getUserPointer();
-
+inline void contactStartedCallback(btPersistentManifold* const& manifold) {
+	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+	
 	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
-		return false;
+		return;
 	
-	ContactEvent contactEvent{ firstCollider->self, secondCollider->self };
+	CollidingEvent collidingEvent;
+	collidingEvent.firstEntity = firstCollider->self;
+	collidingEvent.secondEntity = secondCollider->self;
+	collidingEvent.colliding = true;
+	
+	readManifold(manifold, &collidingEvent);
+	
+	eventsPtr->emit<CollidingEvent>(collidingEvent);
+}
 
-	contactEvent.contactImpulse = cp.getAppliedImpulse();
-	contactEvent.contactDistance = cp.getDistance();
+inline void contactEndedCallback(btPersistentManifold* const& manifold) {
+	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+	
+	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
+		return;
+	
+	CollidingEvent collidingEvent;
+	collidingEvent.firstEntity = firstCollider->self;
+	collidingEvent.secondEntity = secondCollider->self;
+	collidingEvent.colliding = false;
 
-	contactEvent.globalContactPosition = fromBt(cp.m_positionWorldOnB);
-	contactEvent.globalContactNormal = fromBt(cp.m_normalWorldOnB);
+	readManifold(manifold, &collidingEvent);
 	
-	eventsPtr->emit<ContactEvent>(contactEvent);
-	
-	return false;
+	eventsPtr->emit<CollidingEvent>(collidingEvent);
+}
+
+inline void internalTickCallback(btDynamicsWorld* world, btScalar timeStep) {
+	// process manifolds
+	for (uint32_t i = 0; i < world->getDispatcher()->getNumManifolds(); i++) {
+		const auto manifold = world->getDispatcher()->getManifoldByIndexInternal(i);
+
+		Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
+		Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
+
+		if ((!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks) ||
+			(!manifold->getBody0()->isActive() && !manifold->getBody1()->isActive()))
+			continue;
+
+		ContactEvent contactEvent;
+		contactEvent.firstEntity = firstCollider->self;
+		contactEvent.secondEntity = secondCollider->self;
+
+		readManifold(manifold, &contactEvent);
+
+		float impulse = readManifold(manifold, &contactEvent);
+
+		if (impulse == 0)
+			continue;
+
+		eventsPtr->emit<ContactEvent>(contactEvent);
+	}
+
+	eventsPtr->emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{timeStep});
 }
 
 Physics::Physics(const ConstructorInfo& constructorInfo) :
 		_constructorInfo(constructorInfo), 
 		_dispatcher(&_collisionConfiguration), 
 		_dynamicsWorld(&_dispatcher, &_overlappingPairCache, &_solver, &_collisionConfiguration) {
-
+	
 	_dynamicsWorld.setDebugDrawer(&_debugger);
+	_dynamicsWorld.setInternalTickCallback(&internalTickCallback, 0);
 
 	setGravity(_constructorInfo.defaultGravity);
 
-	gContactAddedCallback = contactAddedCallback;
 	gContactStartedCallback = contactStartedCallback;
 	gContactEndedCallback = contactEndedCallback;
 }
@@ -73,59 +115,10 @@ void Physics::configure(entityx::EventManager & events){
 }
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
-	// Copy over transform data to collider
-	//for (auto entity : entities.entities_with_components<Transform, Collider>()) {
-	//	auto transform = entity.component<Transform>();
-	//	auto collider = entity.component<Collider>();
-	//	
-	//	// If position / rotation changed
-	//	glm::vec3 globalPosition;
-	//	glm::quat globalRotation;
-	//	glm::vec3 globalScale;
-	//
-	//	transform->globalDecomposed(&globalPosition, &globalRotation, &globalScale);
-	//	
-	//	btTransform newTransform;
-	//
-	//	newTransform.setOrigin(toBt(globalPosition));
-	//	newTransform.setRotation(toBt(globalRotation));
-	//
-	//	collider->rigidBody.setWorldTransform(newTransform);
-	//
-	//	// If scale, mass, or center of mass changed
-	//	btCollisionShape* collisionShape;
-	//
-	//	std::visit([&](btCollisionShape& shape) {
-	//		collisionShape = &shape;
-	//	}, collider->shapeVariant);
-	//
-	//	if (fromBt(collisionShape->getLocalScaling()) != globalScale) {
-	//		_dynamicsWorld.removeRigidBody(&collider->rigidBody);
-	//
-	//		collisionShape->setLocalScaling(toBt(globalScale));
-	//
-	//		btVector3 inertia;
-	//		collisionShape->calculateLocalInertia(collider->bodyInfo.mass, inertia);
-	//
-	//		collider->rigidBody.setMassProps(collider->bodyInfo.mass, inertia);
-	//
-	//		_dynamicsWorld.addRigidBody(&collider->rigidBody);
-	//	}
-	//}
-
-	//_dynamicsWorld.setSynchronizeAllMotionStates(true);
-
 	// Step the simulation, pumping collision events each step
-	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++){
-
-		//_dynamicsWorld.synchronizeMotionStates();
-
+	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++)
 		_dynamicsWorld.stepSimulation(dt / _constructorInfo.stepsPerUpdate, 0);
-
-		//events.emit<PhysicsUpdateEvent>(PhysicsUpdateEvent{ entities, dt, _constructorInfo.stepsPerUpdate, i });
-	}
-
-
+	
 	// Draw bullet world
 	_debugger.clearLines();
 	_dynamicsWorld.debugDrawWorld();
@@ -184,8 +177,8 @@ void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAdde
 
 	btRigidBody::btRigidBodyConstructionInfo rigidBodyInfo(collider->bodyInfo.mass, (btMotionState*)collider.get(), shape, localInertia);
 	
-	//rigidBodyInfo.m_linearSleepingThreshold = 0;
-	//rigidBodyInfo.m_angularSleepingThreshold = 0;
+	rigidBodyInfo.m_linearSleepingThreshold = 32;
+	rigidBodyInfo.m_angularSleepingThreshold = 32;
 
 	rigidBodyInfo.m_friction = collider->bodyInfo.defaultFriction;
 	rigidBodyInfo.m_rollingFriction = collider->bodyInfo.defaultRollingFriction;

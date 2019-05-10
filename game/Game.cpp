@@ -58,12 +58,12 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		bodyInfo.mass = 62; //kg
 		bodyInfo.alwaysActive = true;
 		bodyInfo.callbacks = true;
-		bodyInfo.defaultAngularFactor = { 0, 0, 1 };
-		//bodyInfo.defaultLinearFactor = { 0, 0, 1 };
+		bodyInfo.defaultAngularFactor = { 0, 0, 0 };
+		//bodyInfo.defaultLinearFactor = { 1, 1, 0.5 };
 		//bodyInfo.defaultLinearDamping = 0.9;
 		//bodyInfo.defaultAngularDamping = 0.9;
 		bodyInfo.defaultRestitution = 0;
-		bodyInfo.defaultFriction = 1;
+		bodyInfo.defaultFriction = 0;
 
 		auto bodyCollider = _body.assign<Collider>(Collider::ShapeInfo{ Collider::Capsule, 80, 150 }, bodyInfo);
 			
@@ -140,7 +140,7 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		bodyInfo.type = Collider::Kinematic;
 		bodyInfo.defaultRestitution = 1;
 		bodyInfo.defaultFriction = 1;
-		bodyInfo.mass = 10000;
+		bodyInfo.mass = 0;
 		bodyInfo.alwaysActive = true;
 
 		platform.assign<Collider>(shapeInfo, bodyInfo);
@@ -152,7 +152,27 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 }
 
 void Game::receive(const PhysicsUpdateEvent & physicsEvent){
+	// Spin stuff for fun
+	for (auto entity : _spinners) {
+		if (!entity.has_component<Transform>())
+			continue;
 
+		auto transform = entity.component<Transform>();
+
+		glm::quat rotation = glm::quat({ 0, 0, glm::radians(5 * physicsEvent.timestep) });
+
+		glm::vec3 newPosition = rotation * transform->position;
+
+		auto collider = entity.component<Collider>();
+
+		glm::vec3 velocity = transform->position - newPosition;
+
+		collider->setLinearVelocity(-velocity / (float)physicsEvent.timestep);
+		collider->setAngularVelocity(glm::eulerAngles(rotation) / (float)physicsEvent.timestep);
+
+		transform->position = newPosition;
+		transform->globalRotate(rotation);
+	}
 }
 
 void Game::receive(const MousePressEvent& mousePressEvent){
@@ -170,74 +190,76 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 	glm::vec3 position = globalHeadRotation * Transform::forward * 100.f;
 	
-	switch (mousePressEvent.button) {
-	case 1:
-	{
-		// Tiny little box
-		entityx::Entity testent = entities.create();
+	for (uint32_t i = 0; i < 1; i++) {
+		switch (mousePressEvent.button) {
+		case 1:
+		{
+			// Tiny little box
+			entityx::Entity testent = entities.create();
 
-		auto transform = testent.assign<Transform>();
-		transform->rotation = globalHeadRotation;
-		transform->position = globalHeadPosition + position;
-		transform->scale *= 10;
+			auto transform = testent.assign<Transform>();
+			transform->rotation = globalHeadRotation;
+			transform->position = globalHeadPosition + position + Transform::up * (float)i;
+			transform->scale = { 10, 10, 10 };
 
-		Collider::ShapeInfo shapeInfo;
-		shapeInfo.type = Collider::Box;
+			Collider::ShapeInfo shapeInfo;
+			shapeInfo.type = Collider::Box;
 
-		Collider::BodyInfo bodyInfo;
-		bodyInfo.type = Collider::Solid;
-		//bodyInfo.defaultRestitution = 0;
-		bodyInfo.defaultFriction = 1;
-		bodyInfo.mass = 1;
+			Collider::BodyInfo bodyInfo;
+			bodyInfo.type = Collider::Solid;
+			//bodyInfo.defaultRestitution = 0;
+			bodyInfo.defaultFriction = 1;
+			bodyInfo.mass = 10;
 
-		testent.assign<Collider>(shapeInfo, bodyInfo);
+			testent.assign<Collider>(shapeInfo, bodyInfo);
 
-		testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "rgb.png" });
+			testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "rgb.png" });
 
-		_sandbox.push_back(testent);
-	}
-
-		break;
-
-	case 3:
-	{
-		// Beachball
-		entityx::Entity testent = entities.create();
-
-		auto transform = testent.assign<Transform>();
-		transform->rotation = globalHeadRotation;
-		transform->position = globalHeadPosition + position;
-		transform->scale *= 64;
-
-		Collider::ShapeInfo shapeInfo;
-		shapeInfo.type = Collider::Sphere;
-
-		Collider::BodyInfo bodyInfo;
-		bodyInfo.type = Collider::Solid;
-		bodyInfo.defaultRestitution = 1;
-		bodyInfo.defaultFriction = 1;
-		bodyInfo.defaultRollingFriction = 1;
-		bodyInfo.defaultSpinningFriction = 1;
-		bodyInfo.defaultLinearDamping = 0.5;
-		bodyInfo.defaultAngularDamping = 0.2;
-		bodyInfo.mass = 1;
-		bodyInfo.callbacks = true;
-
-		testent.assign<Collider>(shapeInfo, bodyInfo);
-
-		Sound::Settings soundInfo;
-		soundInfo.loop = false;
-		soundInfo.radius = 10000;
-		soundInfo.falloffPower = 16;
-
-		//testent.assign<Sound>("sounds/ball.wav", soundInfo);
-
-		testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
-
-		_sandbox.push_back(testent);
-	}
+			_sandbox.push_back(testent);
+		}
 
 		break;
+
+		case 3:
+		{
+			// Beachball
+			entityx::Entity testent = entities.create();
+
+			auto transform = testent.assign<Transform>();
+			transform->rotation = globalHeadRotation;
+			transform->position = globalHeadPosition + position + Transform::up * (float)i;
+			transform->scale *= 64;
+
+			Collider::ShapeInfo shapeInfo;
+			shapeInfo.type = Collider::Sphere;
+
+			Collider::BodyInfo bodyInfo;
+			bodyInfo.type = Collider::Solid;
+			bodyInfo.defaultRestitution = 1;
+			bodyInfo.defaultFriction = 1;
+			bodyInfo.defaultRollingFriction = 1;
+			bodyInfo.defaultSpinningFriction = 1;
+			bodyInfo.defaultLinearDamping = 0.5;
+			bodyInfo.defaultAngularDamping = 0.2;
+			bodyInfo.mass = 1;
+			bodyInfo.callbacks = true;
+
+			testent.assign<Collider>(shapeInfo, bodyInfo);
+
+			Sound::Settings soundInfo;
+			soundInfo.loop = false;
+			soundInfo.radius = 10000;
+			soundInfo.falloffPower = 16;
+
+			testent.assign<Sound>("sounds/ball.wav", soundInfo);
+
+			testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
+
+			_sandbox.push_back(testent);
+		}
+
+		break;
+		}
 	}
 }
 
@@ -259,30 +281,4 @@ void Game::update(double dt){
 	// Buffer physics lines to renderer
 	const BulletDebug& bulletDebug = systems.system<Physics>()->bulletDebug();
 	systems.system<Renderer>()->rebufferLines(bulletDebug.lineCount(), bulletDebug.getLines());
-
-	// Spin stuff for fun
-	for (auto entity : _spinners) {
-		if (!entity.has_component<Transform>())
-			continue;
-
-		auto transform = entity.component<Transform>();
-
-		glm::quat rotation = glm::quat({ 0, 0, glm::radians(5 * dt) });
-		
-		glm::vec3 newPosition = rotation * transform->position;
-
-		auto collider = entity.component<Collider>();
-
-		//glm::vec3 velocity = transform->position - newPosition;
-		//collider->setLinearVelocity(velocity);
-
-		//btTransform bulletTransform;
-		//bulletTransform.setOrigin(toBt(newPosition));
-		//bulletTransform.setRotation(toBt(rotation * transform->rotation));
-		//
-		//collider->rigidBody.getMotionState()->setWorldTransform(bulletTransform);
-
-		transform->position = newPosition;
-		transform->globalRotate(rotation);
-	}
 }

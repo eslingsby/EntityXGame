@@ -8,11 +8,6 @@
 
 #include <btBulletDynamicsCommon.h>
 
-#include <Bullet3Dynamics/b3CpuRigidBodyPipeline.h>
-
-#include "BulletDynamics/Dynamics/btSimpleDynamicsWorld.h"
-#include "BulletDynamics/Dynamics/btRigidBody.h"
-
 class Physics : public entityx::System<Physics>, public entityx::Receiver<Physics> {
 	btDefaultCollisionConfiguration _collisionConfiguration;
 	btCollisionDispatcher _dispatcher;

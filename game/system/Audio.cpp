@@ -480,32 +480,38 @@ void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent
 }
 
 void Audio::receive(const CollidingEvent & collidingEvent){
-	//if (collidingEvent.colliding)
-	//	std::cout << "Colliding!" << std::endl;
-	//else
-	//	std::cout << "Not colliding..." << std::endl;
+	entityx::Entity soundEntity;
+	
+	if (collidingEvent.firstEntity.has_component<Sound>())
+		soundEntity = collidingEvent.firstEntity;
+	else if (collidingEvent.secondEntity.has_component<Sound>())
+		soundEntity = collidingEvent.secondEntity;
+	else
+		return;
+	
+	if (collidingEvent.colliding)
+		std::cout << "Colliding!" << std::endl;
+	else
+		std::cout << "Not colliding..." << std::endl;
 }
 
 void Audio::receive(const ContactEvent & contactEvent){
-	//std::cout << contactEvent.contactImpulse << std::endl;
-
 	entityx::Entity soundEntity;
-	
-	// assume that only one entity has sound for now
+
 	if (contactEvent.firstEntity.has_component<Sound>())
 		soundEntity = contactEvent.firstEntity;
 	else if (contactEvent.secondEntity.has_component<Sound>())
 		soundEntity = contactEvent.secondEntity;
 	else
 		return;
+
+	float impulse = 0.f;
+	float distance = 0.f;
 	
-	if (glm::abs(contactEvent.contactDistance) < 0.4)
-		return;
+	for (uint8_t i = 0; i < contactEvent.contactCount; i++) {
+		impulse += contactEvent.contacts[i].contactImpulse;
+		distance += contactEvent.contacts[i].contactDistance;
+	}
 	
-	std::cout << contactEvent.contactDistance << std::endl;
-		
-	auto sound = soundEntity.component<Sound>();
-	
-	sound->settings.seeking = true;
-	sound->settings.seek = 0.0;
+	std::cout << impulse << std::endl;
 }
