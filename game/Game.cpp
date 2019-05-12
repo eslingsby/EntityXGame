@@ -17,26 +17,25 @@
 #include "other\GlmPrint.hpp"
 
 /*
-To-do:
-- Audio properties (loop, volume, seek, etc)
-- Audio for physics events
+Bugs:
+- Audio stops looping after a while
+- Wrong bullet scaling coordinates
+- Colliders as children
+- Colliders on Transform add and remove
+- Imgui keyboard input not working
 
-- Fix bullet scaling coordinates
-- Fix colliders as children
-- Dynamic collision shape scaling / changing weight / properties
+General:
+- Dynamic collision shape properties (scaling, weight, com)
+- Raycasting from view (highlighting objects, moving axis object)
+- Components/events for physics constraints/raycasting
+- Hierarchy Helper (find by name, find in child, root, destroying children, removing parents)
+- Threaded sound, mesh, and texture loading
 
-- Fix hover and keyboard input in imgui
-
-Less important:
-- Raycasting from view / moving axis object / Focus on click
-- Imgui more component fields / Scene entity table
-
-- Transform functions properly relative to parent
-- Find by name, find in child, root / destroying children / removing parents
-
-- Incoming events. I.e. build lightmap event / buffer debug lines event
-- Make sound, mesh, texture loading threaded / job based
-- Model have contain GlLoader* and collider contain btRigidBodyWorld* ???
+Big:
+- Audio system clean-up (seperate soundio/phonon (dsp) from libnyquist (sample loading))
+- glLoader overaul (clean-up, mesh and texture glmapping, mesh/texture/shader objects)
+- Renderer overhaul (deferred rendering, texture maps, light sources)
+- Radiosity lightmap beginnings
 */
 
 Game::Game(int argc, char** argv) : Engine(argc, argv){
@@ -125,6 +124,32 @@ Game::Game(int argc, char** argv) : Engine(argc, argv){
 		systems.system<Renderer>()->createScene(entities, "triangle_room.fbx", scene);
 	}
 
+	// Speakers
+	{
+		entityx::Entity speaker = entities.create();
+
+		auto transform = speaker.assign<Transform>();
+		transform->position = Transform::forward * 1000.f + Transform::up * 400.f;
+		transform->rotation = glm::quat(glm::vec3(glm::half_pi<float>(), 0, 0));
+		transform->scale *= 0.5f;
+
+		speaker.assign<Model>(Model::FilePaths{ "speaker.obj", 0, "speaker.png" });
+
+		Collider::BodyInfo bodyInfo;
+		bodyInfo.type = Collider::Kinematic;
+		bodyInfo.alwaysActive = true;
+
+		speaker.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 100, 100, 50 }, bodyInfo);
+
+		Sound::Settings soundInfo;
+		soundInfo.radius = 50000;
+		soundInfo.falloffPower = 16;
+
+		speaker.assign<Sound>("sounds/rain.wav", soundInfo);
+
+		_spinners.push_back(speaker);
+	}
+
 	// Create platform
 	{
 		entityx::Entity platform = entities.create();
@@ -161,16 +186,7 @@ void Game::receive(const PhysicsUpdateEvent & physicsEvent){
 
 		glm::quat rotation = glm::quat({ 0, 0, glm::radians(5 * physicsEvent.timestep) });
 
-		glm::vec3 newPosition = rotation * transform->position;
-
-		auto collider = entity.component<Collider>();
-
-		glm::vec3 velocity = transform->position - newPosition;
-
-		collider->setLinearVelocity(-velocity / (float)physicsEvent.timestep);
-		collider->setAngularVelocity(glm::eulerAngles(rotation) / (float)physicsEvent.timestep);
-
-		transform->position = newPosition;
+		transform->position = rotation * transform->position;
 		transform->globalRotate(rotation);
 	}
 }
@@ -188,32 +204,81 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 	headTransform->globalDecomposed(&globalHeadPosition, &globalHeadRotation);
 
-	glm::vec3 position = globalHeadRotation * Transform::forward * 100.f;
+	glm::vec3 position = globalHeadRotation * Transform::forward * 200.f;
+	glm::quat rotation = glm::quat({ 0.f, 0.f, glm::eulerAngles(globalHeadRotation).z });
 	
 	for (uint32_t i = 0; i < 1; i++) {
 		switch (mousePressEvent.button) {
 		case 1:
 		{
-			// Tiny little box
+			// Pizza box
 			entityx::Entity testent = entities.create();
 
 			auto transform = testent.assign<Transform>();
-			transform->rotation = globalHeadRotation;
+			transform->rotation = rotation;
 			transform->position = globalHeadPosition + position + Transform::up * (float)i;
-			transform->scale = { 10, 10, 10 };
+			transform->scale = { 100, 100, 10 };
 
 			Collider::ShapeInfo shapeInfo;
 			shapeInfo.type = Collider::Box;
 
 			Collider::BodyInfo bodyInfo;
 			bodyInfo.type = Collider::Solid;
-			//bodyInfo.defaultRestitution = 0;
-			bodyInfo.defaultFriction = 1;
-			bodyInfo.mass = 10;
+			//bodyInfo.defaultRestitution = 1;
+			bodyInfo.defaultFriction = 0.5;
+			bodyInfo.mass = 5;
+			bodyInfo.callbacks = true;
 
 			testent.assign<Collider>(shapeInfo, bodyInfo);
 
-			testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "rgb.png" });
+			//Sound::Settings soundInfo;
+			//soundInfo.playing = false;
+			//soundInfo.loop = false;
+			//soundInfo.radius = 25000;
+			//soundInfo.falloffPower = 16;
+			//
+			//testent.assign<Sound>("sounds/box.wav", soundInfo);
+
+			testent.assign<Model>(Model::FilePaths{ "shapes/cube.obj", 0, "pizza.png" });
+
+			_sandbox.push_back(testent);
+		}
+
+		break;
+
+		case 2:
+		{
+			// Anvil
+			entityx::Entity testent = entities.create();
+
+			auto transform = testent.assign<Transform>();
+			transform->rotation = rotation;
+			transform->position = globalHeadPosition + position + Transform::up * (float)i;
+			transform->scale *= 100;
+
+			Collider::BodyInfo bodyInfo;
+			bodyInfo.type = Collider::Solid;
+			bodyInfo.defaultRestitution = 0.25;
+			bodyInfo.defaultFriction = 1;
+			bodyInfo.defaultRollingFriction = 1;
+			bodyInfo.defaultSpinningFriction = 1;
+			//bodyInfo.defaultLinearDamping = 0.2;
+			//bodyInfo.defaultAngularDamping = 0.2;
+			bodyInfo.mass = 50000;
+			bodyInfo.callbacks = true;
+
+			testent.assign<Collider>(Collider::ShapeInfo{ Collider::Box, 1.5,1.5,1.5 }, bodyInfo);
+
+			Sound::Settings soundInfo;
+			soundInfo.loop = false;
+			soundInfo.radius = 50000;
+			soundInfo.falloffPower = 64;
+			soundInfo.physical = true;
+			soundInfo.playing = false;
+
+			testent.assign<Sound>("sounds/thud.wav", soundInfo);
+
+			testent.assign<Model>(Model::FilePaths{ "anvil.obj", 0, "anvil.png" });
 
 			_sandbox.push_back(testent);
 		}
@@ -226,7 +291,7 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 			entityx::Entity testent = entities.create();
 
 			auto transform = testent.assign<Transform>();
-			transform->rotation = globalHeadRotation;
+			transform->rotation = rotation;
 			transform->position = globalHeadPosition + position + Transform::up * (float)i;
 			transform->scale *= 64;
 
@@ -235,21 +300,23 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 
 			Collider::BodyInfo bodyInfo;
 			bodyInfo.type = Collider::Solid;
-			bodyInfo.defaultRestitution = 1;
+			bodyInfo.defaultRestitution = 0.95;
 			bodyInfo.defaultFriction = 1;
 			bodyInfo.defaultRollingFriction = 1;
 			bodyInfo.defaultSpinningFriction = 1;
-			bodyInfo.defaultLinearDamping = 0.5;
+			bodyInfo.defaultLinearDamping = 0.2;
 			bodyInfo.defaultAngularDamping = 0.2;
-			bodyInfo.mass = 1;
+			bodyInfo.mass = 5;
 			bodyInfo.callbacks = true;
 
 			testent.assign<Collider>(shapeInfo, bodyInfo);
 
 			Sound::Settings soundInfo;
 			soundInfo.loop = false;
-			soundInfo.radius = 10000;
-			soundInfo.falloffPower = 16;
+			soundInfo.radius = 20000;
+			soundInfo.falloffPower = 32;
+			soundInfo.physical = true;
+			soundInfo.playing = false;
 
 			testent.assign<Sound>("sounds/ball.wav", soundInfo);
 

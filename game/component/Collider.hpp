@@ -100,8 +100,6 @@ struct Collider : public btMotionState {
 
 	ShapeVariant shapeVariant;
 	btRigidBody rigidBody;
-
-	//bool removed = false;
 	
 protected:
 	void getWorldTransform(btTransform& worldTransform) const final;
@@ -122,6 +120,8 @@ public:
 
 	glm::vec3 getLinearVelocity() const;
 	glm::vec3 getAngularVelocity() const;
+
+	float getInvMass() const;
 
 	void applyForce(const glm::vec3& force);
 	void applyImpulse(const glm::vec3 impulse);

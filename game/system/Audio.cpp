@@ -1,7 +1,7 @@
 #include "system\Audio.hpp"
 
 #include "component\Name.hpp"
-#include "component\Transform.hpp"
+#include "component\Collider.hpp"
 
 #include "other\Path.hpp"
 
@@ -58,7 +58,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 		threadContext.unmixedBuffers.clear();
 	
 		for (Audio::SourceContext& sourceContext : threadContext.sourceContexts) {
-			if (!sourceContext.active)
+			if (!sourceContext.active || !sourceContext.soundSettings.playing)
 				continue;
 	
 			uint32_t channels = sourceContext.audioData->channelCount;
@@ -66,7 +66,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 			uint32_t audioSampleCount = sourceContext.audioData->samples.size();
 			uint32_t sampleRate = sourceContext.audioData->sampleRate; // when audio is resampled to be the same, use threadContext.sampleRate instead
 
-			if (sourceContext.soundSettings.seeking) {
+			if (!sourceContext.seeked && sourceContext.soundSettings.seeking) {
 				double length = sampleRate / audioSampleCount;
 				
 				if (sourceContext.soundSettings.seek <= 0)
@@ -76,7 +76,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 				else
 					sourceContext.currentSample = sourceContext.soundSettings.seek * sampleRate * channels;
 
-				sourceContext.soundSettings.seeking = false;
+				sourceContext.seeked = true;
 			}
 
 			// Non looping file that's at the end
@@ -90,7 +90,7 @@ void writeCallback(SoundIoOutStream* outstream, int frameCountMin, int frameCoun
 				uint32_t samplesGot = glm::min(audioSampleCount - sourceContext.currentSample, samplesToFill);
 			
 				for (uint32_t i = 0; i < samplesGot; i++)
-					sourceContext.inBuffer[samplesAvailable - samplesToFill + i] = sourceContext.audioData->samples[sourceContext.currentSample + i];
+					sourceContext.inBuffer[samplesAvailable - samplesToFill + i] = sourceContext.audioData->samples[sourceContext.currentSample + i] * sourceContext.soundSettings.power;
 			
 				samplesToFill -= samplesGot;
 				sourceContext.currentSample += samplesGot;
@@ -324,6 +324,8 @@ void Audio::configure(entityx::EventManager & events){
 	events.subscribe<entityx::ComponentAddedEvent<Listener>>(*this);
 	events.subscribe<entityx::ComponentAddedEvent<Sound>>(*this);
 	events.subscribe<entityx::ComponentRemovedEvent<Sound>>(*this);
+	events.subscribe<entityx::ComponentAddedEvent<Transform>>(*this);
+	events.subscribe<entityx::ComponentRemovedEvent<Transform>>(*this);
 }
 
 void Audio::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
@@ -349,10 +351,12 @@ void Audio::update(entityx::EntityManager & entities, entityx::EventManager & ev
 
 		transform->globalDecomposed(&sourceContext.globalPosition, &sourceContext.globalRotation);
 
-		sourceContext.soundSettings = sound->settings;
-
-		if (sound->settings.seeking)
+		if (sourceContext.seeked) {
+			sourceContext.seeked = false;
 			sound->settings.seeking = false;
+		}
+
+		sourceContext.soundSettings = sound->settings;
 	}
 }
 
@@ -438,17 +442,21 @@ void Audio::receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent) 
 	sourceContext.middleBufferContext.interleavedBuffer = &sourceContext.middleBuffer[0];
 	sourceContext.outBufferContext.interleavedBuffer = &sourceContext.outBuffer[0];
 
-	sourceContext.active = true;
+	sourceContext.audioData = audioData;
 
-	sourceContext.globalPosition = glm::vec3();
-	sourceContext.globalRotation = glm::quat();
+	if (soundAddedEvent.entity.has_component<Transform>()) {
+		auto transform = soundAddedEvent.entity.component<const Transform>();
+
+		sourceContext.active = true;
+		transform->globalDecomposed(&sourceContext.globalPosition, &sourceContext.globalRotation);
+	}
+	else {
+		sourceContext.active = false;
+		sourceContext.globalPosition = glm::vec3();
+		sourceContext.globalRotation = glm::quat();
+	}
 
 	sourceContext.soundSettings = sound->settings;
-		
-	//sourceContext.audioDecoder = audioDecoder;
-	//sourceContext.dataView = data->createInstance();
-	//sourceContext.dataView->mChannels = channels;
-	sourceContext.audioData = audioData;
 }
 
 void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent){
@@ -479,39 +487,75 @@ void Audio::receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent
 	_threadContext.freeSourceContexts.push_back(sound->sourceContextIndex);
 }
 
-void Audio::receive(const CollidingEvent & collidingEvent){
-	entityx::Entity soundEntity;
-	
-	if (collidingEvent.firstEntity.has_component<Sound>())
-		soundEntity = collidingEvent.firstEntity;
-	else if (collidingEvent.secondEntity.has_component<Sound>())
-		soundEntity = collidingEvent.secondEntity;
-	else
+void Audio::receive(const entityx::ComponentAddedEvent<Transform>& transformAddedEvent) {
+	if (!transformAddedEvent.entity.has_component<Sound>())
 		return;
-	
-	if (collidingEvent.colliding)
-		std::cout << "Colliding!" << std::endl;
-	else
-		std::cout << "Not colliding..." << std::endl;
+
+	auto sound = transformAddedEvent.entity.component<const Sound>();
+
+	if (sound->sourceContextIndex == -1)
+		return;
+
+	SourceContext& sourceContext = _threadContext.sourceContexts[sound->sourceContextIndex];
+	transformAddedEvent.component->globalDecomposed(&sourceContext.globalPosition, &sourceContext.globalRotation);
+	sourceContext.active = true;
 }
 
-void Audio::receive(const ContactEvent & contactEvent){
-	entityx::Entity soundEntity;
+void Audio::receive(const entityx::ComponentRemovedEvent<Transform>& transformAddedEvent) {
+	if (!transformAddedEvent.entity.has_component<Sound>())
+		return;
 
-	if (contactEvent.firstEntity.has_component<Sound>())
-		soundEntity = contactEvent.firstEntity;
-	else if (contactEvent.secondEntity.has_component<Sound>())
-		soundEntity = contactEvent.secondEntity;
-	else
+	auto sound = transformAddedEvent.entity.component<const Sound>();
+
+	if (sound->sourceContextIndex == -1)
+		return;
+
+	SourceContext& sourceContext = _threadContext.sourceContexts[sound->sourceContextIndex];
+	sourceContext.active = false;
+}
+
+inline void entityCollidingEvent(entityx::Entity entity) {
+	if (!entity.has_component<Sound>())
+		return;
+
+	auto sound = entity.component<Sound>();
+
+	if (!sound->settings.physical)
+		return;
+
+	sound->settings.playing = true;
+	sound->settings.seeking = true;
+	sound->settings.seek = 0;
+}
+
+void Audio::receive(const CollidingEvent & collidingEvent){
+	entityCollidingEvent(collidingEvent.firstEntity);
+	entityCollidingEvent(collidingEvent.secondEntity);
+}
+
+inline void entityContactEvent(entityx::Entity entity, const ContactEvent & contactEvent) {
+	if (!entity.has_component<Sound>())
 		return;
 
 	float impulse = 0.f;
 	float distance = 0.f;
-	
+
 	for (uint8_t i = 0; i < contactEvent.contactCount; i++) {
 		impulse += contactEvent.contacts[i].contactImpulse;
 		distance += contactEvent.contacts[i].contactDistance;
 	}
-	
-	std::cout << impulse << std::endl;
+
+	auto collider = entity.component<Collider>();
+	float relativeImpulse = impulse * collider->getInvMass();
+
+	if (relativeImpulse < 50)
+		return;
+
+	auto sound = entity.component<Sound>();
+	sound->settings.power = glm::clamp(relativeImpulse, 0.f, 1000.f) / 1000.f;
+}
+
+void Audio::receive(const ContactEvent & contactEvent){
+	entityContactEvent(contactEvent.firstEntity, contactEvent);
+	entityContactEvent(contactEvent.secondEntity, contactEvent);
 }

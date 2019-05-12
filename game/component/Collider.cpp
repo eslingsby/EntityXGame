@@ -115,6 +115,10 @@ glm::vec3 Collider::getAngularVelocity() const{
 	return fromBt(rigidBody.getAngularVelocity());
 }
 
+float Collider::getInvMass() const{
+	return rigidBody.getInvMass();
+}
+
 void Collider::applyForce(const glm::vec3 & force){
 	rigidBody.applyCentralForce(toBt(force));
 }

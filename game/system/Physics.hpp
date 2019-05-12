@@ -16,17 +16,18 @@ class Physics : public entityx::System<Physics>, public entityx::Receiver<Physic
 	btDiscreteDynamicsWorld _dynamicsWorld;
 
 	BulletDebug _debugger;
+	bool _debugLines;
+
+	glm::vec3 _defaultGravity;
+	uint32_t _stepsPerUpdate;
 
 public:
 	struct ConstructorInfo {
 		glm::vec3 defaultGravity = { 0.f, 0.f, -1000.f };
 		uint32_t stepsPerUpdate = 1;
+		bool debugLines = false;
 	};
 
-private:
-	const ConstructorInfo _constructorInfo;
-
-public:
 	Physics(const ConstructorInfo& constructorInfo = ConstructorInfo());
 
 	void configure(entityx::EventManager &events) final;

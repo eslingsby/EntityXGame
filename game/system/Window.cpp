@@ -135,15 +135,25 @@ void Window::_recreateWindow(entityx::EventManager & events){
 	if (_window)
 		_closeWindow(events);
 
+	uint32_t flags = SDL_WINDOW_OPENGL;
+
+	switch (_windowInfo.mode) {
+	case Resizable:
+		flags |= SDL_WINDOW_RESIZABLE;
+		break;
+	case Fullscreen:
+		flags |= SDL_WINDOW_FULLSCREEN;
+		break;
+	}
+
 	_window = SDL_CreateWindow(
 		_windowInfo.title, 
 		SDL_WINDOWPOS_CENTERED_DISPLAY(_windowInfo.monitor), 
 		SDL_WINDOWPOS_CENTERED_DISPLAY(_windowInfo.monitor),
-		_windowInfo.size.x, 
-		_windowInfo.size.y, 
-		_windowInfo.flags
+		_windowInfo.size.x,
+		_windowInfo.size.y,
+		flags
 	);
-
 	
 	if (!_window) {
 		std::cerr << "Window SDL_CreateWindow: " << SDL_GetError() << std::endl;
@@ -157,7 +167,6 @@ void Window::_recreateWindow(entityx::EventManager & events){
 
 	// Emit open events
 	events.emit<WindowSizeEvent>(WindowSizeEvent{ _windowInfo.size });
-	events.emit<FramebufferSizeEvent>(FramebufferSizeEvent{ _windowInfo.size });
 	events.emit<WindowOpenEvent>(WindowOpenEvent{ true });
 }
 
@@ -188,9 +197,8 @@ void Window::_pumpWindowEvents(entityx::EventManager & events){
 		case SDL_WINDOWEVENT:
 			switch (e.window.event) {
 
-			case SDL_WINDOWEVENT_RESIZED:
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
 				events.emit<WindowSizeEvent>(WindowSizeEvent{ glm::uvec2(e.window.data1, e.window.data2) });
-				events.emit<FramebufferSizeEvent>(FramebufferSizeEvent{ glm::uvec2(e.window.data1, e.window.data2) });
 				continue;
 
 			case SDL_WINDOWEVENT_ENTER:
@@ -267,6 +275,12 @@ Window::Window(const ConstructorInfo& constructorInfo) :
 
 	error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, _constructorInfo.contextVersionMajor);
 	error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, _constructorInfo.contextVersionMinor);
+
+	error |= SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	error |= SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	error |= SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	error |= SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	error |= SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
 	if (_constructorInfo.coreContex)
 		error |= SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);

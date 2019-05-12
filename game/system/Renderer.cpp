@@ -58,10 +58,13 @@ Renderer::Renderer(const ConstructorInfo& constructorInfo) :
 void Renderer::configure(entityx::EventManager& events) {
 	events.subscribe<entityx::ComponentAddedEvent<Model>>(*this);
 	events.subscribe<entityx::ComponentAddedEvent<Camera>>(*this);
-	events.subscribe<FramebufferSizeEvent>(*this);
+	events.subscribe<WindowSizeEvent>(*this);
 }
 
 void Renderer::rebufferLines(uint32_t count, const Line * lines){
+	if (!count || !lines)
+		return;
+
 	glBindVertexArray(_lineBufferObject);
 	glBindBuffer(GL_ARRAY_BUFFER, _lineBuffer);
 
@@ -79,10 +82,10 @@ void Renderer::rebufferLines(uint32_t count, const Line * lines){
 void Renderer::update(entityx::EntityManager& entities, entityx::EventManager& events, double dt) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (_frameBufferSize == glm::uvec2{ 0, 0 })
+	if (_windowSize == glm::uvec2{ 0, 0 })
 		return;
 
-	glViewport(0, 0, _frameBufferSize.x, _frameBufferSize.y);
+	glViewport(0, 0, _windowSize.x, _windowSize.y);
 
 	// bind shared matrices
 	const GlobalMatrices uniforms = { viewMatrix(), projectionMatrix() };
@@ -172,8 +175,8 @@ void Renderer::receive(const entityx::ComponentAddedEvent<Camera>& cameraAddedEv
 	_camera = cameraAddedEvent.entity;
 }
 
-void Renderer::receive(const FramebufferSizeEvent& frameBufferSizeEvent){
-	_frameBufferSize = frameBufferSizeEvent.size;
+void Renderer::receive(const WindowSizeEvent & windowSizeEvent){
+	_windowSize = windowSizeEvent.size;
 }
 
 entityx::Entity Renderer::createScene(entityx::EntityManager& entities, const std::string & meshFile, entityx::Entity entity){
@@ -229,11 +232,11 @@ entityx::Entity Renderer::createScene(entityx::EntityManager& entities, const st
 }
 
 glm::mat4 Renderer::projectionMatrix() const{
-	if (!_camera.valid() || !_camera.has_component<Camera>() || _frameBufferSize.x == 0 || _frameBufferSize.y == 0)
+	if (!_camera.valid() || !_camera.has_component<Camera>() || _windowSize.x == 0 || _windowSize.y == 0)
 		return glm::mat4();
 
 	auto camera = _camera.component<const Camera>();
-	return glm::perspectiveFov(glm::radians(camera->verticalFov), (float)_frameBufferSize.x, (float)_frameBufferSize.y, 1.f, camera->zDepth);
+	return glm::perspectiveFov(glm::radians(camera->verticalFov), (float)_windowSize.x, (float)_windowSize.y, 1.f, camera->zDepth);
 }
 
 glm::mat4 Renderer::viewMatrix() const {

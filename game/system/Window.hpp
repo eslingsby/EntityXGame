@@ -17,11 +17,17 @@ class Window : public entityx::System<Window> {
 	bool _contextWindow = true;
 
 public:
+	enum WindowMode {
+		Windowed,
+		Resizable,
+		Fullscreen
+	};
+
 	struct WindowInfo {
-		uint32_t flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+		WindowMode mode = Resizable;
+
 		const char* title = "";
 		glm::uvec2 size = { 800, 600 };
-		glm::uvec2 resolution = { 800, 600 };
 		uint32_t monitor = 0;
 		bool lockedCursor = false;
 	};

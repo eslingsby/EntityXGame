@@ -8,14 +8,19 @@ struct Sound {
 		float radius = 10000.f;
 		uint32_t falloffPower = 3;
 
-		// currently ignored
-		bool playing = true;
+		bool physical = false;
+
 		bool loop = true;
-		bool attenuated = true;
-		bool binaural = true;
 
 		bool seeking = false;
-		double seek = 0.0;
+		double seek = 0;
+
+		float power = 1;
+
+		// currently ignored
+		bool playing = true;
+		bool attenuated = true;
+		bool binaural = true;
 	} settings;
 
 	Sound(const std::string& soundFile, const Settings& settings) : soundFile(soundFile), settings(settings) {};

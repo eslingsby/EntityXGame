@@ -30,7 +30,8 @@ inline float readManifold(const btPersistentManifold* const& from, ContactEvent*
 	return combinedImpulse;
 }
 
-inline void contactStartedCallback(btPersistentManifold* const& manifold) {
+template <bool Colliding>
+inline void contactCallback(btPersistentManifold* const& manifold) {
 	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
 	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
 	
@@ -40,24 +41,7 @@ inline void contactStartedCallback(btPersistentManifold* const& manifold) {
 	CollidingEvent collidingEvent;
 	collidingEvent.firstEntity = firstCollider->self;
 	collidingEvent.secondEntity = secondCollider->self;
-	collidingEvent.colliding = true;
-	
-	readManifold(manifold, &collidingEvent);
-	
-	eventsPtr->emit<CollidingEvent>(collidingEvent);
-}
-
-inline void contactEndedCallback(btPersistentManifold* const& manifold) {
-	Collider* firstCollider = (Collider*)manifold->getBody0()->getUserPointer();
-	Collider* secondCollider = (Collider*)manifold->getBody1()->getUserPointer();
-	
-	if (!firstCollider->bodyInfo.callbacks && !secondCollider->bodyInfo.callbacks)
-		return;
-	
-	CollidingEvent collidingEvent;
-	collidingEvent.firstEntity = firstCollider->self;
-	collidingEvent.secondEntity = secondCollider->self;
-	collidingEvent.colliding = false;
+	collidingEvent.colliding = Colliding;
 
 	readManifold(manifold, &collidingEvent);
 	
@@ -94,17 +78,21 @@ inline void internalTickCallback(btDynamicsWorld* world, btScalar timeStep) {
 }
 
 Physics::Physics(const ConstructorInfo& constructorInfo) :
-		_constructorInfo(constructorInfo), 
+		_defaultGravity(constructorInfo.defaultGravity),
+		_stepsPerUpdate(constructorInfo.stepsPerUpdate),
+		_debugLines(constructorInfo.debugLines),
 		_dispatcher(&_collisionConfiguration), 
 		_dynamicsWorld(&_dispatcher, &_overlappingPairCache, &_solver, &_collisionConfiguration) {
 	
-	_dynamicsWorld.setDebugDrawer(&_debugger);
+	if (_debugLines)
+		_dynamicsWorld.setDebugDrawer(&_debugger);
+
+	setGravity(_defaultGravity);
+
 	_dynamicsWorld.setInternalTickCallback(&internalTickCallback, 0);
 
-	setGravity(_constructorInfo.defaultGravity);
-
-	gContactStartedCallback = contactStartedCallback;
-	gContactEndedCallback = contactEndedCallback;
+	gContactStartedCallback = contactCallback<true>;
+	gContactEndedCallback = contactCallback<false>;
 }
 
 void Physics::configure(entityx::EventManager & events){
@@ -115,13 +103,15 @@ void Physics::configure(entityx::EventManager & events){
 }
 
 void Physics::update(entityx::EntityManager & entities, entityx::EventManager & events, double dt){
-	// Step the simulation, pumping collision events each step
-	for (uint32_t i = 0; i < _constructorInfo.stepsPerUpdate; i++)
-		_dynamicsWorld.stepSimulation(dt / _constructorInfo.stepsPerUpdate, 0);
+	// Step the simulation
+	for (uint32_t i = 0; i < _stepsPerUpdate; i++)
+		_dynamicsWorld.stepSimulation(dt / _stepsPerUpdate, 0);
 	
 	// Draw bullet world
-	_debugger.clearLines();
-	_dynamicsWorld.debugDrawWorld();
+	if (_debugLines) {
+		_debugger.clearLines();
+		_dynamicsWorld.debugDrawWorld();
+	}
 }
 
 void Physics::receive(const entityx::ComponentAddedEvent<Collider>& colliderAddedEvent) {

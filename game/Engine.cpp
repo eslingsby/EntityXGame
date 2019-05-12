@@ -39,17 +39,19 @@ Engine::Engine(int argc, char** argv) {
 	rendererInfo.defaultTexture = "checker.png";
 
 	Window::ConstructorInfo windowInfo;
-	//windowInfo.debugContext = true;
 	windowInfo.defaultWindow.title = "EntityX Engine";
 	windowInfo.defaultWindow.lockedCursor = false;
+	//windowInfo.defaultWindow.mode = Window::Windowed;
+	//windowInfo.defaultWindow.size = { 1280, 720 };
+	//windowInfo.debugContext = true;
 
 	Physics::ConstructorInfo physicsInfo;
 	physicsInfo.defaultGravity = { 0, 0, -980.7f };
 	physicsInfo.stepsPerUpdate = 1;
+	//physicsInfo.debugLines = true;
 
 	Audio::ConstructorInfo audioInfo;
 	audioInfo.sampleRate = 48000;
-	//audioInfo.sampleRate = 44100;
 	audioInfo.frameSize = 512;
 	audioInfo.path = dataPath.string();
 

@@ -57,7 +57,7 @@ private:
 	GLuint _lineBuffer = 0;
 	uint32_t _lineCount = 0;
 
-	glm::uvec2 _frameBufferSize;
+	glm::uvec2 _windowSize;
 	entityx::Entity _camera;
 
 public:
@@ -68,7 +68,7 @@ public:
 
 	void receive(const entityx::ComponentAddedEvent<Model>& modelAddedEvent);
 	void receive(const entityx::ComponentAddedEvent<Camera>& cameraAddedEvent);
-	void receive(const FramebufferSizeEvent& frameBufferSizeEvent);
+	void receive(const WindowSizeEvent& windowSizeEvent);
 
 	entityx::Entity createScene(entityx::EntityManager &entities, const std::string& meshFile, entityx::Entity entity = entityx::Entity());
 

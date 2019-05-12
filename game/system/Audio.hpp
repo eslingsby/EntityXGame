@@ -4,6 +4,7 @@
 
 #include "system\PhysicsEvents.hpp"
 
+#include "component\Transform.hpp"
 #include "component\Listener.hpp"
 #include "component\Sound.hpp"
 
@@ -52,6 +53,8 @@ class Audio : public entityx::System<Audio>, public entityx::Receiver<Audio> {
 
 		const nqr::AudioData* audioData;
 		uint32_t currentSample = 0;
+
+		bool seeked = false;
 
 		glm::vec3 globalPosition;
 		glm::quat globalRotation;
@@ -108,6 +111,8 @@ public:
 	void receive(const entityx::ComponentAddedEvent<Listener>& listenerAddedEvent);
 	void receive(const entityx::ComponentAddedEvent<Sound>& soundAddedEvent);
 	void receive(const entityx::ComponentRemovedEvent<Sound>& soundAddedEvent);
+	void receive(const entityx::ComponentAddedEvent<Transform>& transformAddedEvent);
+	void receive(const entityx::ComponentRemovedEvent<Transform>& transformAddedEvent);
 	void receive(const CollidingEvent& collidingEvent);
 	void receive(const ContactEvent& contactEvent);
 
