@@ -18,13 +18,13 @@
 
 /*
 Bugs:
-- Audio stops looping after a while
 - Wrong bullet scaling coordinates
 - Colliders as children
 - Colliders on Transform add and remove
 - Imgui keyboard input not working
 
 General:
+- Re-implement audio seeking, properties, etc
 - Dynamic collision shape properties (scaling, weight, com)
 - Raycasting from view (highlighting objects, moving axis object)
 - Components/events for physics constraints/raycasting
@@ -32,10 +32,10 @@ General:
 - Threaded sound, mesh, and texture loading
 
 Big:
-- Audio system clean-up (seperate soundio/phonon (dsp) from libnyquist (sample loading))
 - glLoader overaul (clean-up, mesh and texture glmapping, mesh/texture/shader objects)
 - Renderer overhaul (deferred rendering, texture maps, light sources)
 - Radiosity lightmap beginnings
+- Phonon reverb / Enviorenment
 */
 
 Game::Game(int argc, char** argv) : Engine(argc, argv){
@@ -273,10 +273,10 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 			soundInfo.loop = false;
 			soundInfo.radius = 50000;
 			soundInfo.falloffPower = 64;
-			soundInfo.physical = true;
+			//soundInfo.physical = true;
 			soundInfo.playing = false;
 
-			testent.assign<Sound>("sounds/thud.wav", soundInfo);
+			//testent.assign<Sound>("sounds/thud.wav", soundInfo);
 
 			testent.assign<Model>(Model::FilePaths{ "anvil.obj", 0, "anvil.png" });
 
@@ -315,10 +315,10 @@ void Game::receive(const MousePressEvent& mousePressEvent){
 			soundInfo.loop = false;
 			soundInfo.radius = 20000;
 			soundInfo.falloffPower = 32;
-			soundInfo.physical = true;
+			//soundInfo.physical = true;
 			soundInfo.playing = false;
 
-			testent.assign<Sound>("sounds/ball.wav", soundInfo);
+			//testent.assign<Sound>("sounds/ball.wav", soundInfo);
 
 			testent.assign<Model>(Model::FilePaths{ "shapes/sphere.obj", 0, "beachball.png" });
 
