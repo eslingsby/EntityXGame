@@ -1,7 +1,7 @@
 <img src="/bin/data/banner.png" alt="preview" width="100%"/>
 
 ## EntityX Game
-WIP game in EntityX. A lot of systems and components are copied over from [SimpleEngine](https://github.com/ElliottSlingsby/SimpleEngine).
+WIP game in EntityX. A lot of systems and components are copied over from [SimpleEngine](https://github.com/eslingsby/SimpleEngine).
 
 Currently only working with CMake Visual Studio 15 2017 generator on Windows. Thirdparty libraries are downloaded by CMake on generation.
 
